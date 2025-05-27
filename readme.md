@@ -14,7 +14,7 @@ Ce projet est organisé en monorepo avec les composants suivants :
 
 ```bash
 git clone https://github.com/RiseNet-Web/GestAsso.git
-cd GestAsso
+cd GestAsso/infrastructure
 make install
 ```
 
