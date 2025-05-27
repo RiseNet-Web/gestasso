@@ -68,7 +68,7 @@ RUN mkdir -p /var/www/symfony/var/log \
     && mkdir -p /var/www/symfony/config/jwt
 
 # Script de démarrage
-COPY docker/php/start.sh /usr/local/bin/start.sh
+COPY docker/php/start-simple.sh /usr/local/bin/start.sh
 RUN chmod +x /usr/local/bin/start.sh
 
 # Permissions

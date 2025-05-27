@@ -45,10 +45,11 @@ help:
 	@echo "  make-controller - Crée un nouveau contrôleur"
 	@echo "  make-migration - Crée une nouvelle migration"
 	@echo ""
-	@echo "$(YELLOW)Frontend:$(NC)"
-	@echo "  frontend-install - Installe les dépendances frontend"
-	@echo "  frontend-build - Build le frontend pour production"
-	@echo "  frontend-dev - Démarre le serveur de développement frontend"
+	@echo "$(YELLOW)SvelteKit Frontend:$(NC)"
+	@echo "  frontend-install - Installe les dépendances SvelteKit"
+	@echo "  frontend-build - Build SvelteKit pour production"
+	@echo "  frontend-dev - Démarre le serveur de développement SvelteKit"
+	@echo "  frontend-preview - Démarre le serveur de preview SvelteKit"
 	@echo ""
 	@echo "$(YELLOW)Tests et qualité:$(NC)"
 	@echo "  test        - Lance tous les tests"
@@ -72,7 +73,8 @@ install: env-check build start init-symfony
 	@echo "  - Profiler: http://localhost:$(shell grep NGINX_PORT .env 2>/dev/null | cut -d '=' -f2 || echo "8080")/_profiler"
 	@echo "  - pgAdmin: http://localhost:$(shell grep PGADMIN_PORT .env 2>/dev/null | cut -d '=' -f2 || echo "8081")"
 	@echo "  - MailHog: http://localhost:$(shell grep MAILHOG_WEB_PORT .env 2>/dev/null | cut -d '=' -f2 || echo "8025")"
-	@echo "  - Frontend Dev: http://localhost:$(shell grep FRONTEND_DEV_PORT .env 2>/dev/null | cut -d '=' -f2 || echo "3000")"
+	@echo "  - SvelteKit Dev: http://localhost:$(shell grep FRONTEND_DEV_PORT .env 2>/dev/null | cut -d '=' -f2 || echo "5173")"
+	@echo "  - SvelteKit Preview: http://localhost:$(shell grep FRONTEND_PREVIEW_PORT .env 2>/dev/null | cut -d '=' -f2 || echo "4173")"
 
 ## Vérification du fichier .env
 env-check:
@@ -89,7 +91,7 @@ setup: env-check
 	@mkdir -p $(shell grep BACKEND_PATH .env 2>/dev/null | cut -d '=' -f2 || echo "../backend")/var/cache
 	@mkdir -p $(shell grep BACKEND_PATH .env 2>/dev/null | cut -d '=' -f2 || echo "../backend")/public/uploads
 	@mkdir -p $(shell grep BACKEND_PATH .env 2>/dev/null | cut -d '=' -f2 || echo "../backend")/config/jwt
-	@mkdir -p $(shell grep FRONTEND_PATH .env 2>/dev/null | cut -d '=' -f2 || echo "../frontend")/dist
+	@mkdir -p $(shell grep FRONTEND_PATH .env 2>/dev/null | cut -d '=' -f2 || echo "../frontend")/build
 	@mkdir -p $(shell grep FRONTEND_PATH .env 2>/dev/null | cut -d '=' -f2 || echo "../frontend")/src
 	@chmod -R 755 $(shell grep BACKEND_PATH .env 2>/dev/null | cut -d '=' -f2 || echo "../backend")/
 	@chmod -R 755 $(shell grep FRONTEND_PATH .env 2>/dev/null | cut -d '=' -f2 || echo "../frontend")/
@@ -251,22 +253,27 @@ composer-update:
 	@$(DOCKER_COMPOSE) exec $(PHP_CONTAINER) composer update
 	@echo "$(GREEN)✅ Dépendances mises à jour$(NC)"
 
-## Installe les dépendances frontend
+## Installe les dépendances SvelteKit
 frontend-install:
-	@echo "$(YELLOW)📦 Installation des dépendances frontend...$(NC)"
+	@echo "$(YELLOW)📦 Installation des dépendances SvelteKit...$(NC)"
 	@$(DOCKER_COMPOSE) exec frontend npm install
-	@echo "$(GREEN)✅ Dépendances frontend installées$(NC)"
+	@echo "$(GREEN)✅ Dépendances SvelteKit installées$(NC)"
 
-## Build le frontend pour production
+## Build SvelteKit pour production
 frontend-build:
-	@echo "$(YELLOW)🔨 Build du frontend...$(NC)"
+	@echo "$(YELLOW)🔨 Build de SvelteKit...$(NC)"
 	@$(DOCKER_COMPOSE) exec frontend npm run build
-	@echo "$(GREEN)✅ Frontend buildé$(NC)"
+	@echo "$(GREEN)✅ SvelteKit buildé$(NC)"
 
-## Démarre le serveur de développement frontend
+## Démarre le serveur de développement SvelteKit
 frontend-dev:
-	@echo "$(YELLOW)🚀 Démarrage du serveur de développement frontend...$(NC)"
-	@$(DOCKER_COMPOSE) exec frontend npm run dev
+	@echo "$(YELLOW)🚀 Démarrage du serveur de développement SvelteKit...$(NC)"
+	@$(DOCKER_COMPOSE) exec frontend npm run dev -- --host 0.0.0.0
+
+## Démarre le serveur de preview SvelteKit
+frontend-preview:
+	@echo "$(YELLOW)👁️ Démarrage du serveur de preview SvelteKit...$(NC)"
+	@$(DOCKER_COMPOSE) exec frontend npm run preview -- --host 0.0.0.0
 
 ## Affiche les variables d'environnement
 env-show:

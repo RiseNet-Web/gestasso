@@ -36,7 +36,8 @@ BACKEND_PATH=./mon-backend # Changer le chemin du backend
 |----------|--------|-------------|
 | `NGINX_PORT` | `8080` | Port du serveur web principal |
 | `NGINX_SSL_PORT` | `8443` | Port HTTPS |
-| `FRONTEND_DEV_PORT` | `3000` | Port du serveur de développement frontend |
+| `FRONTEND_DEV_PORT` | `5173` | Port du serveur de développement SvelteKit |
+| `FRONTEND_PREVIEW_PORT` | `4173` | Port du serveur de preview SvelteKit |
 | `POSTGRES_PORT` | `5432` | Port PostgreSQL |
 | `REDIS_PORT` | `6379` | Port Redis |
 | `PGADMIN_PORT` | `8081` | Port pgAdmin |
@@ -109,11 +110,12 @@ environment:
   - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
 ```
 
-### Intégration avec le Frontend
-Variables disponibles dans le conteneur frontend :
+### Intégration avec SvelteKit Frontend
+Variables disponibles dans le conteneur SvelteKit :
 ```yaml
 environment:
   - NODE_ENV=${NODE_ENV:-development}
+  - VITE_API_URL=http://localhost:${NGINX_PORT:-8080}/api
 ```
 
 ## 🔒 Sécurité
@@ -181,7 +183,8 @@ make restart
 ```bash
 # Changer les ports dans .env
 NGINX_PORT=9080
-FRONTEND_DEV_PORT=4000
+FRONTEND_DEV_PORT=5174
+FRONTEND_PREVIEW_PORT=4174
 PGADMIN_PORT=9081
 ```
 
