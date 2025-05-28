@@ -6,4 +6,15 @@ knpu_oauth2_client:
             client_secret: '%env(GOOGLE_OAUTH_CLIENT_SECRET)%'
             redirect_route: connect_google_check
             redirect_params: {}
-            use_state: true 
+            use_state: true
+        apple:
+            type: generic
+            provider_class: App\OAuth\AppleProvider
+            client_id: '%env(APPLE_OAUTH_CLIENT_ID)%'
+            client_secret: ~ # Apple utilise un JWT généré dynamiquement
+            redirect_route: connect_apple_check
+            redirect_params: {}
+            provider_options:
+                teamId: '%env(APPLE_TEAM_ID)%'
+                keyId: '%env(APPLE_KEY_ID)%'
+                privateKey: '%env(APPLE_PRIVATE_KEY)%' 
