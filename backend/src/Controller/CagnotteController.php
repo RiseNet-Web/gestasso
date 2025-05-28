@@ -5,9 +5,11 @@ namespace App\Controller;
 use App\Entity\Cagnotte;
 use App\Entity\Team;
 use App\Entity\Event;
+use App\Entity\User;
 use App\Repository\CagnotteRepository;
 use App\Service\CagnotteService;
 use Doctrine\ORM\EntityManagerInterface;
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -17,6 +19,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[Route('/api')]
+#[OA\Tag(name: 'Cagnottes', description: 'Gestion des cagnottes et événements avec distribution de gains')]
 class CagnotteController extends AbstractController
 {
     public function __construct(
@@ -28,6 +31,78 @@ class CagnotteController extends AbstractController
 
     #[Route('/teams/{id}/cagnottes', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
+    #[OA\Get(
+        path: '/api/teams/{id}/cagnottes',
+        summary: 'Cagnottes de l\'équipe',
+        description: 'Récupère toutes les cagnottes d\'une équipe avec un résumé des montants totaux. Accessible aux membres de l\'équipe et aux gestionnaires.',
+        tags: ['Cagnottes'],
+        security: [['JWT' => []]]
+    )]
+    #[OA\Parameter(
+        name: 'id',
+        description: 'ID de l\'équipe',
+        in: 'path',
+        required: true,
+        schema: new OA\Schema(type: 'integer', example: 1)
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Liste des cagnottes de l\'équipe avec résumé',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(
+                    property: 'cagnottes',
+                    type: 'array',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer', example: 1),
+                            new OA\Property(
+                                property: 'user',
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'integer', example: 5),
+                                    new OA\Property(property: 'firstName', type: 'string', example: 'Jean'),
+                                    new OA\Property(property: 'lastName', type: 'string', example: 'Dupont'),
+                                    new OA\Property(property: 'email', type: 'string', example: 'jean.dupont@example.com')
+                                ]
+                            ),
+                            new OA\Property(property: 'currentAmount', type: 'number', format: 'decimal', example: 250.75),
+                            new OA\Property(property: 'totalEarned', type: 'number', format: 'decimal', example: 450.50),
+                            new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', example: '2024-01-15T10:30:00+00:00'),
+                            new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time', example: '2024-02-20T14:20:00+00:00')
+                        ]
+                    )
+                ),
+                new OA\Property(
+                    property: 'summary',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'totalAmount', type: 'number', format: 'decimal', example: 2750.25),
+                        new OA\Property(property: 'totalEarned', type: 'number', format: 'decimal', example: 4200.75),
+                        new OA\Property(property: 'count', type: 'integer', example: 15)
+                    ]
+                )
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 403,
+        description: 'Permission refusée - Utilisateur non autorisé à voir cette équipe',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Accès refusé')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 404,
+        description: 'Équipe non trouvée',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Équipe non trouvée')
+            ]
+        )
+    )]
     public function getTeamCagnottes(int $id): JsonResponse
     {
         $team = $this->entityManager->getRepository(Team::class)->find($id);
@@ -67,6 +142,87 @@ class CagnotteController extends AbstractController
 
     #[Route('/cagnottes/{id}', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
+    #[OA\Get(
+        path: '/api/cagnottes/{id}',
+        summary: 'Détails de la cagnotte',
+        description: 'Récupère les détails d\'une cagnotte avec l\'historique des 20 dernières transactions. Accessible au propriétaire de la cagnotte et aux gestionnaires.',
+        tags: ['Cagnottes'],
+        security: [['JWT' => []]]
+    )]
+    #[OA\Parameter(
+        name: 'id',
+        description: 'ID de la cagnotte',
+        in: 'path',
+        required: true,
+        schema: new OA\Schema(type: 'integer', example: 1)
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Détails de la cagnotte avec transactions',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'id', type: 'integer', example: 1),
+                new OA\Property(
+                    property: 'user',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 5),
+                        new OA\Property(property: 'firstName', type: 'string', example: 'Jean'),
+                        new OA\Property(property: 'lastName', type: 'string', example: 'Dupont'),
+                        new OA\Property(property: 'email', type: 'string', example: 'jean.dupont@example.com')
+                    ]
+                ),
+                new OA\Property(
+                    property: 'team',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 1),
+                        new OA\Property(property: 'name', type: 'string', example: 'Équipe Senior')
+                    ]
+                ),
+                new OA\Property(property: 'currentAmount', type: 'number', format: 'decimal', example: 250.75),
+                new OA\Property(property: 'totalEarned', type: 'number', format: 'decimal', example: 450.50),
+                new OA\Property(
+                    property: 'transactions',
+                    type: 'array',
+                    description: 'Les 20 dernières transactions (triées par date décroissante)',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer', example: 15),
+                            new OA\Property(property: 'amount', type: 'number', format: 'decimal', example: 45.50),
+                            new OA\Property(property: 'type', type: 'string', enum: ['earning', 'usage', 'adjustment'], example: 'earning'),
+                            new OA\Property(property: 'description', type: 'string', example: 'Gain du tournoi de fin d\'année'),
+                            new OA\Property(
+                                property: 'event',
+                                type: 'object',
+                                nullable: true,
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'integer', example: 3),
+                                    new OA\Property(property: 'title', type: 'string', example: 'Tournoi de fin d\'année')
+                                ]
+                            ),
+                            new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', example: '2024-02-20T14:20:00+00:00')
+                        ]
+                    )
+                ),
+                new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', example: '2024-01-15T10:30:00+00:00'),
+                new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time', example: '2024-02-20T14:20:00+00:00')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 403,
+        description: 'Permission refusée - Utilisateur non autorisé à voir cette cagnotte'
+    )]
+    #[OA\Response(
+        response: 404,
+        description: 'Cagnotte non trouvée',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Cagnotte non trouvée')
+            ]
+        )
+    )]
     public function getCagnotte(int $id): JsonResponse
     {
         $cagnotte = $this->cagnotteRepository->find($id);
@@ -113,143 +269,87 @@ class CagnotteController extends AbstractController
         ]);
     }
 
-    #[Route('/teams/{id}/events', methods: ['POST'])]
-    #[IsGranted('ROLE_USER')]
-    public function createEvent(int $id, Request $request): JsonResponse
-    {
-        $team = $this->entityManager->getRepository(Team::class)->find($id);
-        
-        if (!$team) {
-            return $this->json(['error' => 'Équipe non trouvée'], Response::HTTP_NOT_FOUND);
-        }
-
-        // Vérifier les permissions
-        $this->denyAccessUnlessGranted('TEAM_MANAGE', $team);
-
-        $data = json_decode($request->getContent(), true);
-
-        $event = new Event();
-        $event->setTitle($data['title'] ?? '');
-        $event->setDescription($data['description'] ?? null);
-        $event->setTotalBudget($data['totalBudget'] ?? 0);
-        $event->setClubPercentage($data['clubPercentage'] ?? 0);
-        $event->setTeam($team);
-        $event->setCreatedBy($this->getUser());
-        $event->setEventDate(new \DateTime($data['eventDate'] ?? 'now'));
-        $event->setStatus('draft');
-
-        // Valider l'entité
-        $errors = $this->validator->validate($event);
-        if (count($errors) > 0) {
-            $errorMessages = [];
-            foreach ($errors as $error) {
-                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-            }
-            return $this->json(['errors' => $errorMessages], Response::HTTP_BAD_REQUEST);
-        }
-
-        $this->entityManager->persist($event);
-        $this->entityManager->flush();
-
-        return $this->json([
-            'id' => $event->getId(),
-            'title' => $event->getTitle(),
-            'description' => $event->getDescription(),
-            'totalBudget' => $event->getTotalBudget(),
-            'clubPercentage' => $event->getClubPercentage(),
-            'teamId' => $team->getId(),
-            'eventDate' => $event->getEventDate()->format('c'),
-            'status' => $event->getStatus(),
-            'createdAt' => $event->getCreatedAt()->format('c')
-        ], Response::HTTP_CREATED);
-    }
-
-    #[Route('/events/{id}/participants', methods: ['POST'])]
-    #[IsGranted('ROLE_USER')]
-    public function addEventParticipants(int $id, Request $request): JsonResponse
-    {
-        $event = $this->entityManager->getRepository(Event::class)->find($id);
-        
-        if (!$event) {
-            return $this->json(['error' => 'Événement non trouvé'], Response::HTTP_NOT_FOUND);
-        }
-
-        // Vérifier les permissions
-        $this->denyAccessUnlessGranted('TEAM_MANAGE', $event->getTeam());
-
-        if ($event->getStatus() !== 'active') {
-            return $this->json(['error' => 'L\'événement doit être actif pour ajouter des participants'], Response::HTTP_BAD_REQUEST);
-        }
-
-        $data = json_decode($request->getContent(), true);
-        
-        if (!isset($data['userIds']) || !is_array($data['userIds'])) {
-            return $this->json(['error' => 'userIds doit être un tableau'], Response::HTTP_BAD_REQUEST);
-        }
-
-        $addedCount = 0;
-        foreach ($data['userIds'] as $userId) {
-            $user = $this->entityManager->getRepository(User::class)->find($userId);
-            if ($user) {
-                // Vérifier que l'utilisateur est membre de l'équipe
-                $isMember = $event->getTeam()->getTeamMembers()->exists(
-                    fn($key, $member) => $member->getUser() === $user && $member->isActive()
-                );
-                
-                if ($isMember) {
-                    $this->cagnotteService->addEventParticipant($event, $user);
-                    $addedCount++;
-                }
-            }
-        }
-
-        $this->entityManager->flush();
-
-        return $this->json([
-            'message' => sprintf('%d participant(s) ajouté(s) avec succès', $addedCount),
-            'addedCount' => $addedCount,
-            'eventId' => $event->getId()
-        ]);
-    }
-
-    #[Route('/events/{id}/distribute', methods: ['PUT'])]
-    #[IsGranted('ROLE_USER')]
-    public function distributeEventGains(int $id): JsonResponse
-    {
-        $event = $this->entityManager->getRepository(Event::class)->find($id);
-        
-        if (!$event) {
-            return $this->json(['error' => 'Événement non trouvé'], Response::HTTP_NOT_FOUND);
-        }
-
-        // Vérifier les permissions
-        $this->denyAccessUnlessGranted('TEAM_MANAGE', $event->getTeam());
-
-        if ($event->getStatus() !== 'active') {
-            return $this->json(['error' => 'L\'événement doit être actif pour distribuer les gains'], Response::HTTP_BAD_REQUEST);
-        }
-
-        try {
-            $result = $this->cagnotteService->distributeEventGains($event);
-            
-            // Marquer l'événement comme complété
-            $event->setStatus('completed');
-            $this->entityManager->flush();
-
-            return $this->json([
-                'message' => 'Gains distribués avec succès',
-                'totalDistributed' => $result['totalDistributed'],
-                'participantsCount' => $result['participantsCount'],
-                'amountPerParticipant' => $result['amountPerParticipant'],
-                'clubCommission' => $result['clubCommission']
-            ]);
-        } catch (\Exception $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
-        }
-    }
-
     #[Route('/users/{userId}/cagnotte', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
+    #[OA\Get(
+        path: '/api/users/{userId}/cagnotte',
+        summary: 'Cagnottes d\'un utilisateur',
+        description: 'Récupère les cagnottes d\'un utilisateur. L\'utilisateur peut voir ses propres cagnottes, les gestionnaires peuvent voir toutes les cagnottes. Filtrage possible par équipe.',
+        tags: ['Cagnottes'],
+        security: [['JWT' => []]]
+    )]
+    #[OA\Parameter(
+        name: 'userId',
+        description: 'ID de l\'utilisateur',
+        in: 'path',
+        required: true,
+        schema: new OA\Schema(type: 'integer', example: 5)
+    )]
+    #[OA\Parameter(
+        name: 'teamId',
+        description: 'Filtrer par équipe (optionnel)',
+        in: 'query',
+        required: false,
+        schema: new OA\Schema(type: 'integer', example: 1)
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Cagnottes de l\'utilisateur',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(
+                    property: 'cagnottes',
+                    type: 'array',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer', example: 1),
+                            new OA\Property(
+                                property: 'team',
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'integer', example: 1),
+                                    new OA\Property(property: 'name', type: 'string', example: 'Équipe Senior')
+                                ]
+                            ),
+                            new OA\Property(property: 'currentAmount', type: 'number', format: 'decimal', example: 250.75),
+                            new OA\Property(property: 'totalEarned', type: 'number', format: 'decimal', example: 450.50),
+                            new OA\Property(
+                                property: 'lastTransaction',
+                                type: 'object',
+                                nullable: true,
+                                properties: [
+                                    new OA\Property(property: 'amount', type: 'number', format: 'decimal', example: 45.50),
+                                    new OA\Property(property: 'type', type: 'string', example: 'earning'),
+                                    new OA\Property(property: 'date', type: 'string', format: 'date-time', example: '2024-02-20T14:20:00+00:00')
+                                ]
+                            ),
+                            new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', example: '2024-01-15T10:30:00+00:00'),
+                            new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time', example: '2024-02-20T14:20:00+00:00')
+                        ]
+                    )
+                ),
+                new OA\Property(property: 'totalAmount', type: 'number', format: 'decimal', example: 750.25)
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 403,
+        description: 'Permission refusée - Utilisateur non autorisé à voir ces cagnottes',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Accès refusé')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 404,
+        description: 'Utilisateur non trouvé',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Utilisateur non trouvé')
+            ]
+        )
+    )]
     public function getUserCagnotte(int $userId, Request $request): JsonResponse
     {
         $user = $this->entityManager->getRepository(User::class)->find($userId);
@@ -297,4 +397,4 @@ class CagnotteController extends AbstractController
             'totalAmount' => array_reduce($cagnottes, fn($sum, $c) => $sum + $c->getCurrentAmount(), 0)
         ]);
     }
-} 
+}

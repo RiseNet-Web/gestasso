@@ -5,10 +5,12 @@ namespace App\Service;
 use App\Entity\Document;
 use App\Entity\DocumentType;
 use App\Entity\User;
+use App\Entity\Team;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\String\Slugger\SluggerInterface;
 use Vich\UploaderBundle\Handler\UploadHandler;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class DocumentService
 {
@@ -19,6 +21,7 @@ class DocumentService
         private SluggerInterface $slugger,
         private UploadHandler $uploadHandler,
         private NotificationService $notificationService,
+        private ValidatorInterface $validator,
         string $uploadDirectory
     ) {
         $this->uploadDirectory = $uploadDirectory;
@@ -290,5 +293,28 @@ class DocumentService
         // Supprimer l'entité
         $this->entityManager->remove($document);
         $this->entityManager->flush();
+    }
+
+    public function createDocumentType(Team $team, array $data): DocumentType
+    {
+        $documentType = new DocumentType();
+        $documentType->setTeam($team);
+        $documentType->setName($data['name'] ?? '');
+        $documentType->setDescription($data['description'] ?? null);
+        $documentType->setIsRequired($data['isRequired'] ?? true);
+        if (isset($data['deadline'])) {
+            $documentType->setDeadline(new \DateTime($data['deadline']));
+        }
+        $errors = $this->validator->validate($documentType);
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
+            }
+            throw new \InvalidArgumentException(json_encode($errorMessages));
+        }
+        $this->entityManager->persist($documentType);
+        $this->entityManager->flush();
+        return $documentType;
     }
 } 

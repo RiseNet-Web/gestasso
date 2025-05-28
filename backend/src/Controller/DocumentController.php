@@ -63,39 +63,17 @@ class DocumentController extends AbstractController
     public function createDocumentType(int $id, Request $request): JsonResponse
     {
         $team = $this->entityManager->getRepository(Team::class)->find($id);
-        
         if (!$team) {
             return $this->json(['error' => 'Équipe non trouvée'], Response::HTTP_NOT_FOUND);
         }
-
-        // Vérifier les permissions
         $this->denyAccessUnlessGranted('TEAM_MANAGE', $team);
-
         $data = json_decode($request->getContent(), true);
-
-        $documentType = new DocumentType();
-        $documentType->setTeam($team);
-        $documentType->setName($data['name'] ?? '');
-        $documentType->setDescription($data['description'] ?? null);
-        $documentType->setIsRequired($data['isRequired'] ?? true);
-        
-        if (isset($data['deadline'])) {
-            $documentType->setDeadline(new \DateTime($data['deadline']));
+        try {
+            $documentType = $this->documentService->createDocumentType($team, $data);
+        } catch (\InvalidArgumentException $e) {
+            $msg = json_decode($e->getMessage(), true) ?: ['error' => $e->getMessage()];
+            return $this->json(['errors' => $msg], Response::HTTP_BAD_REQUEST);
         }
-
-        // Valider l'entité
-        $errors = $this->validator->validate($documentType);
-        if (count($errors) > 0) {
-            $errorMessages = [];
-            foreach ($errors as $error) {
-                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-            }
-            return $this->json(['errors' => $errorMessages], Response::HTTP_BAD_REQUEST);
-        }
-
-        $this->entityManager->persist($documentType);
-        $this->entityManager->flush();
-
         return $this->json([
             'id' => $documentType->getId(),
             'name' => $documentType->getName(),
@@ -213,17 +191,12 @@ class DocumentController extends AbstractController
     public function deleteDocument(int $id): JsonResponse
     {
         $document = $this->documentRepository->find($id);
-        
         if (!$document) {
             return $this->json(['error' => 'Document non trouvé'], Response::HTTP_NOT_FOUND);
         }
-
-        // Vérifier les permissions
         $this->denyAccessUnlessGranted('DOCUMENT_DELETE', $document);
-
         $this->documentService->deleteDocument($document);
-
-        return $this->json(['message' => 'Document supprimé avec succès'], Response::HTTP_NO_CONTENT);
+        return $this->json(['success' => true]);
     }
 
     #[Route('/users/{userId}/documents', methods: ['GET'])]

@@ -467,4 +467,33 @@ class PaymentService
         
         return $remindersSent;
     }
+
+    public function createPaymentFromSchedule(PaymentSchedule $schedule, User $user): Payment
+    {
+        $payment = new Payment();
+        $payment->setPaymentSchedule($schedule);
+        $payment->setTeam($schedule->getTeam());
+        $payment->setUser($user);
+        $payment->setAmount($schedule->getAmount());
+        $payment->setDueDate($schedule->getDueDate());
+        $payment->setStatus('pending');
+        return $payment;
+    }
+
+    public function updatePayment(Payment $payment, array $data): Payment
+    {
+        if (isset($data['amountPaid'])) {
+            $payment->setAmountPaid($data['amountPaid']);
+            if ($payment->getAmountPaid() >= $payment->getAmount()) {
+                $payment->setStatus('paid');
+                $payment->setPaidAt(new \DateTime());
+            } elseif ($payment->getAmountPaid() > 0) {
+                $payment->setStatus('partial');
+            }
+        }
+        if (isset($data['notes'])) {
+            $payment->setNotes($data['notes']);
+        }
+        return $payment;
+    }
 } 

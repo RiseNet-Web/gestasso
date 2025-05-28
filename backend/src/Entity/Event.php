@@ -80,7 +80,7 @@ class Event
     #[ORM\ManyToOne(inversedBy: 'events')]
     #[ORM\JoinColumn(nullable: false)]
     #[Groups(['event:read', 'event:details'])]
-    private ?Team $team = null;
+    private ?Club $club = null;
 
     #[ORM\ManyToOne(inversedBy: 'createdEvents')]
     #[ORM\JoinColumn(nullable: false)]
@@ -181,14 +181,14 @@ class Event
         return $this;
     }
 
-    public function getTeam(): ?Team
+    public function getClub(): ?Club
     {
-        return $this->team;
+        return $this->club;
     }
 
-    public function setTeam(?Team $team): static
+    public function setClub(?Club $club): static
     {
-        $this->team = $team;
+        $this->club = $club;
         return $this;
     }
 

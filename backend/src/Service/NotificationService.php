@@ -98,10 +98,8 @@ class NotificationService
      */
     public function markAsRead(Notification $notification): void
     {
-        if (!$notification->isRead()) {
-            $notification->setIsRead(true);
-            $this->entityManager->flush();
-        }
+        $notification->setIsRead(true);
+        $this->entityManager->flush();
     }
 
     /**
@@ -109,16 +107,24 @@ class NotificationService
      */
     public function markAllAsRead(User $user): int
     {
-        $qb = $this->entityManager->createQueryBuilder();
-        $qb->update(Notification::class, 'n')
-            ->set('n.isRead', ':read')
-            ->where('n.user = :user')
-            ->andWhere('n.isRead = :unread')
-            ->setParameter('read', true)
-            ->setParameter('user', $user)
-            ->setParameter('unread', false);
+        $notifications = $this->entityManager->getRepository(Notification::class)->findBy([
+            'user' => $user,
+            'isRead' => false
+        ]);
+        foreach ($notifications as $notification) {
+            $notification->setIsRead(true);
+        }
+        $this->entityManager->flush();
+        return count($notifications);
+    }
 
-        return $qb->getQuery()->execute();
+    /**
+     * Supprime une notification
+     */
+    public function deleteNotification(Notification $notification): void
+    {
+        $this->entityManager->remove($notification);
+        $this->entityManager->flush();
     }
 
     /**

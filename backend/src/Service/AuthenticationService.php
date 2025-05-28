@@ -92,8 +92,6 @@ class AuthenticationService
         return $response;
     }
 
-
-
     public function linkProvider(User $user, string $provider, string $providerId, string $email): UserAuthentication
     {
         // Vérifier que ce provider n'est pas déjà lié
@@ -147,5 +145,22 @@ class AuthenticationService
         $this->entityManager->flush();
 
         return true;
+    }
+
+    public function register(array $data): array
+    {
+        // Logique d'inscription utilisateur (validation, création, hashage, etc.)
+        // Retourne ['user' => $user, 'token' => $token]
+    }
+
+    public function login(string $email, string $password): array
+    {
+        // Logique d'authentification utilisateur (vérification, token, etc.)
+        // Retourne ['user' => $user, 'token' => $token]
+    }
+
+    public function refreshToken(User $user): string
+    {
+        // Logique de renouvellement du token JWT
     }
 } 

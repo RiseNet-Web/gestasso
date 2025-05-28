@@ -12,6 +12,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
+use App\Service\ProfileService;
 
 #[Route('/api')]
 class ProfileController extends AbstractController
@@ -19,7 +20,8 @@ class ProfileController extends AbstractController
     public function __construct(
         private EntityManagerInterface $entityManager,
         private ValidatorInterface $validator,
-        private UserPasswordHasherInterface $passwordHasher
+        private UserPasswordHasherInterface $passwordHasher,
+        private ProfileService $profileService
     ) {}
 
     #[Route('/profile', methods: ['GET'])]
@@ -75,48 +77,14 @@ class ProfileController extends AbstractController
     #[IsGranted('ROLE_USER')]
     public function updateProfile(Request $request): JsonResponse
     {
-        /** @var User $user */
         $user = $this->getUser();
         $data = json_decode($request->getContent(), true);
-
-        // Mise à jour des champs autorisés
-        if (isset($data['firstName'])) {
-            $user->setFirstName($data['firstName']);
+        try {
+            $user = $this->profileService->updateProfile($user, $data);
+        } catch (\InvalidArgumentException $e) {
+            $msg = json_decode($e->getMessage(), true) ?: ['error' => $e->getMessage()];
+            return $this->json(['errors' => $msg], Response::HTTP_BAD_REQUEST);
         }
-        if (isset($data['lastName'])) {
-            $user->setLastName($data['lastName']);
-        }
-        if (isset($data['phoneNumber'])) {
-            $user->setPhoneNumber($data['phoneNumber']);
-        }
-        if (isset($data['dateOfBirth'])) {
-            $user->setDateOfBirth(new \DateTime($data['dateOfBirth']));
-        }
-        if (isset($data['address'])) {
-            $user->setAddress($data['address']);
-        }
-        if (isset($data['city'])) {
-            $user->setCity($data['city']);
-        }
-        if (isset($data['postalCode'])) {
-            $user->setPostalCode($data['postalCode']);
-        }
-        if (isset($data['country'])) {
-            $user->setCountry($data['country']);
-        }
-
-        // Valider l'entité
-        $errors = $this->validator->validate($user);
-        if (count($errors) > 0) {
-            $errorMessages = [];
-            foreach ($errors as $error) {
-                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-            }
-            return $this->json(['errors' => $errorMessages], Response::HTTP_BAD_REQUEST);
-        }
-
-        $this->entityManager->flush();
-
         return $this->json([
             'message' => 'Profil mis à jour avec succès',
             'user' => [
@@ -138,30 +106,16 @@ class ProfileController extends AbstractController
     #[IsGranted('ROLE_USER')]
     public function changePassword(Request $request): JsonResponse
     {
-        /** @var User $user */
         $user = $this->getUser();
         $data = json_decode($request->getContent(), true);
-
         if (!isset($data['currentPassword']) || !isset($data['newPassword'])) {
             return $this->json(['error' => 'currentPassword et newPassword sont requis'], Response::HTTP_BAD_REQUEST);
         }
-
-        // Vérifier le mot de passe actuel
-        if (!$this->passwordHasher->isPasswordValid($user, $data['currentPassword'])) {
-            return $this->json(['error' => 'Mot de passe actuel incorrect'], Response::HTTP_BAD_REQUEST);
+        try {
+            $this->profileService->changePassword($user, $data['currentPassword'], $data['newPassword']);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
-
-        // Valider le nouveau mot de passe
-        if (strlen($data['newPassword']) < 8) {
-            return $this->json(['error' => 'Le nouveau mot de passe doit contenir au moins 8 caractères'], Response::HTTP_BAD_REQUEST);
-        }
-
-        // Mettre à jour le mot de passe
-        $hashedPassword = $this->passwordHasher->hashPassword($user, $data['newPassword']);
-        $user->setPassword($hashedPassword);
-
-        $this->entityManager->flush();
-
         return $this->json(['message' => 'Mot de passe modifié avec succès']);
     }
 
@@ -169,42 +123,18 @@ class ProfileController extends AbstractController
     #[IsGranted('ROLE_USER')]
     public function completeOnboarding(Request $request): JsonResponse
     {
-        /** @var User $user */
         $user = $this->getUser();
-
-        if ($user->isOnboardingCompleted()) {
-            return $this->json(['error' => 'L\'onboarding est déjà complété'], Response::HTTP_BAD_REQUEST);
-        }
-
         $data = json_decode($request->getContent(), true);
-
-        if (!isset($data['type']) || !in_array($data['type'], ['owner', 'member'])) {
-            return $this->json(['error' => 'Type d\'onboarding invalide (owner ou member)'], Response::HTTP_BAD_REQUEST);
+        if (!isset($data['type'])) {
+            return $this->json(['error' => 'Type d\'onboarding requis'], Response::HTTP_BAD_REQUEST);
         }
-
-        // Vérifier les permissions
         $this->denyAccessUnlessGranted('ONBOARDING_COMPLETE');
-
-        $user->setOnboardingType($data['type']);
-        $user->setOnboardingCompleted(true);
-
-        // Si c'est un owner, lui donner le rôle approprié
-        if ($data['type'] === 'owner') {
-            $roles = $user->getRoles();
-            if (!in_array('ROLE_CLUB_OWNER', $roles)) {
-                $roles[] = 'ROLE_CLUB_OWNER';
-                $user->setRoles($roles);
-            }
+        try {
+            $this->profileService->completeOnboarding($user, $data['type']);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
-
-        $this->entityManager->flush();
-
-        return $this->json([
-            'message' => 'Onboarding complété avec succès',
-            'onboardingType' => $user->getOnboardingType(),
-            'onboardingCompleted' => $user->isOnboardingCompleted(),
-            'roles' => $user->getRoles()
-        ]);
+        return $this->json(['message' => 'Onboarding complété avec succès']);
     }
 
     #[Route('/profile/stats', methods: ['GET'])]

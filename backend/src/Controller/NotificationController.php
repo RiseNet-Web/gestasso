@@ -76,18 +76,13 @@ class NotificationController extends AbstractController
     public function markAsRead(int $id): JsonResponse
     {
         $notification = $this->notificationRepository->find($id);
-        
         if (!$notification) {
             return $this->json(['error' => 'Notification non trouvée'], Response::HTTP_NOT_FOUND);
         }
-        
-        // Vérifier que la notification appartient à l'utilisateur
         if ($notification->getUser() !== $this->getUser()) {
             throw $this->createAccessDeniedException();
         }
-        
         $this->notificationService->markAsRead($notification);
-        
         return $this->json([
             'id' => $notification->getId(),
             'isRead' => $notification->isRead()
@@ -100,7 +95,6 @@ class NotificationController extends AbstractController
     {
         $user = $this->getUser();
         $count = $this->notificationService->markAllAsRead($user);
-        
         return $this->json([
             'message' => sprintf('%d notification(s) marquée(s) comme lue(s)', $count),
             'count' => $count
@@ -112,19 +106,13 @@ class NotificationController extends AbstractController
     public function deleteNotification(int $id): JsonResponse
     {
         $notification = $this->notificationRepository->find($id);
-        
         if (!$notification) {
             return $this->json(['error' => 'Notification non trouvée'], Response::HTTP_NOT_FOUND);
         }
-        
-        // Vérifier que la notification appartient à l'utilisateur
         if ($notification->getUser() !== $this->getUser()) {
             throw $this->createAccessDeniedException();
         }
-        
-        $this->entityManager->remove($notification);
-        $this->entityManager->flush();
-        
+        $this->notificationService->deleteNotification($notification);
         return $this->json(['message' => 'Notification supprimée avec succès'], Response::HTTP_NO_CONTENT);
     }
 
