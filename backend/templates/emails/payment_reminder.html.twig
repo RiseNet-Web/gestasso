@@ -1,0 +1,10 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+    <h2>Rappel de paiement</h2>
+    <p>Bonjour {{ user_name }},</p>
+    <p>Nous vous rappelons que vous avez un paiement de <strong>{{ amount }} €</strong> à effectuer avant le <strong>{{ due_date|date('d/m/Y') }}</strong>.</p>
+    {% if payment_url is defined %}
+        <p><a href="{{ payment_url }}" style="display:inline-block;padding:10px 20px;background:#28a745;color:#fff;text-decoration:none;border-radius:4px;">Payer maintenant</a></p>
+    {% endif %}
+{% endblock %} 

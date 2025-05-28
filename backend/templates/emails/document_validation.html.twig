@@ -1,0 +1,10 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+    <h2>Statut de votre document</h2>
+    <p>Bonjour {{ user_name }},</p>
+    <p>Votre document <strong>{{ document_name }}</strong> a été {{ status }}.</p>
+    {% if comment is defined %}
+        <p>Commentaire : {{ comment }}</p>
+    {% endif %}
+{% endblock %} 
