@@ -1,7 +1,25 @@
 api_platform:
-    title: Hello API Platform
-    version: 1.0.0
+    title: 'GestAsso API'
+    description: 'API de gestion de clubs sportifs'
+    version: '1.0.0'
     defaults:
         stateless: true
         cache_headers:
             vary: ['Content-Type', 'Authorization', 'Origin']
+    enable_swagger_ui: true
+    enable_re_doc: true
+    docs_formats:
+        jsonopenapi: ['application/vnd.openapi+json']
+        html: ['text/html']
+    swagger:
+        versions: [3]
+        api_keys:
+            JWT:
+                name: Authorization
+                type: header
+    openapi:
+        contact:
+            name: 'Support GestAsso'
+            email: 'support@gestasso.com'
+        license:
+            name: 'Propriétaire'
