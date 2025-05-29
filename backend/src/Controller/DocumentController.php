@@ -25,8 +25,7 @@ class DocumentController extends AbstractController
         private EntityManagerInterface $entityManager,
         private ValidatorInterface $validator,
         private DocumentRepository $documentRepository,
-        private DocumentService $documentService,
-        private string $uploadDirectory
+        private DocumentService $documentService
     ) {}
 
     #[Route('/teams/{id}/document-types', methods: ['GET'])]
@@ -138,13 +137,7 @@ class DocumentController extends AbstractController
         // Vérifier les permissions
         $this->denyAccessUnlessGranted('DOCUMENT_VIEW', $document);
 
-        $filePath = $this->uploadDirectory . '/' . $document->getFilePath();
-        
-        if (!file_exists($filePath)) {
-            return $this->json(['error' => 'Fichier non trouvé'], Response::HTTP_NOT_FOUND);
-        }
-
-        return new BinaryFileResponse($filePath);
+        return $this->documentService->getDocumentFileResponse($document);
     }
 
     #[Route('/documents/{id}/validate', methods: ['PUT'])]

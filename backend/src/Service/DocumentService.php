@@ -11,6 +11,8 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\String\Slugger\SluggerInterface;
 use Vich\UploaderBundle\Handler\UploadHandler;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 class DocumentService
 {
@@ -43,7 +45,7 @@ class DocumentService
         $document->setUser($user);
         $document->setDocumentType($documentType);
         $document->setOriginalName($file->getClientOriginalName());
-        $document->setStatus('pending');
+        $document->setStatus(DocumentStatus::PENDING);
         $document->setCreatedAt(new \DateTime());
         $document->setUpdatedAt(new \DateTime());
 
@@ -316,5 +318,17 @@ class DocumentService
         $this->entityManager->persist($documentType);
         $this->entityManager->flush();
         return $documentType;
+    }
+
+    /**
+     * Retourne la réponse de téléchargement d'un document
+     */
+    public function getDocumentFileResponse(Document $document): Response
+    {
+        $filePath = $this->uploadDirectory . '/' . $document->getFilePath();
+        if (!file_exists($filePath)) {
+            return new Response(json_encode(['error' => 'Fichier non trouvé']), 404, ['Content-Type' => 'application/json']);
+        }
+        return new BinaryFileResponse($filePath);
     }
 } 
