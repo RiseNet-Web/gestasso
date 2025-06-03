@@ -9,6 +9,7 @@ use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\Put;
 use ApiPlatform\Metadata\Delete;
 use App\Repository\TeamRepository;
+use App\Enum\TeamMemberRole;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
@@ -18,6 +19,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: TeamRepository::class)]
 #[ORM\HasLifecycleCallbacks]
+#[Assert\Callback([Team::class, 'validateAgeRestrictionsCallback'])]
 #[ApiResource(
     operations: [
         new GetCollection(
@@ -80,6 +82,19 @@ class Team
     #[Assert\PositiveOrZero(message: 'Le prix annuel doit être positif ou nul.')]
     #[Groups(['team:read', 'team:create', 'team:update', 'team:details'])]
     private ?string $annualPrice = null;
+
+    #[ORM\Column(length: 20, nullable: true)]
+    #[Assert\Choice(choices: ['male', 'female', 'mixed'], message: 'Le genre doit être male, female ou mixed.')]
+    #[Groups(['team:read', 'team:create', 'team:update', 'team:details'])]
+    private ?string $gender = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['team:read', 'team:create', 'team:update', 'team:details'])]
+    private ?int $minBirthYear = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['team:read', 'team:create', 'team:update', 'team:details'])]
+    private ?int $maxBirthYear = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
     #[Groups(['team:details'])]
@@ -220,6 +235,39 @@ class Team
     public function setAnnualPrice(?string $annualPrice): static
     {
         $this->annualPrice = $annualPrice;
+        return $this;
+    }
+
+    public function getGender(): ?string
+    {
+        return $this->gender;
+    }
+
+    public function setGender(?string $gender): static
+    {
+        $this->gender = $gender;
+        return $this;
+    }
+
+    public function getMinBirthYear(): ?int
+    {
+        return $this->minBirthYear;
+    }
+
+    public function setMinBirthYear(?int $minBirthYear): static
+    {
+        $this->minBirthYear = $minBirthYear;
+        return $this;
+    }
+
+    public function getMaxBirthYear(): ?int
+    {
+        return $this->maxBirthYear;
+    }
+
+    public function setMaxBirthYear(?int $maxBirthYear): static
+    {
+        $this->maxBirthYear = $maxBirthYear;
         return $this;
     }
 
@@ -465,7 +513,7 @@ class Team
     public function getAthletes(): Collection
     {
         return $this->teamMembers->filter(function(TeamMember $member) {
-            return $member->getRole() === 'ROLE_ATHLETE' && $member->isActive();
+            return $member->getRole() === TeamMemberRole::ATHLETE && $member->isActive();
         });
     }
 
@@ -475,7 +523,7 @@ class Team
     public function getCoaches(): Collection
     {
         return $this->teamMembers->filter(function(TeamMember $member) {
-            return $member->getRole() === 'ROLE_COACH' && $member->isActive();
+            return $member->getRole() === TeamMemberRole::COACH && $member->isActive();
         });
     }
 
@@ -498,7 +546,7 @@ class Team
     public function hasCoach(User $user): bool
     {
         foreach ($this->teamMembers as $member) {
-            if ($member->getUser() === $user && $member->getRole() === 'ROLE_COACH' && $member->isActive()) {
+            if ($member->getUser() === $user && $member->getRole() === TeamMemberRole::COACH && $member->isActive()) {
                 return true;
             }
         }
@@ -556,5 +604,102 @@ class Team
     public function __toString(): string
     {
         return $this->name ?? '';
+    }
+
+    /**
+     * Vérifie si un utilisateur respecte les restrictions d'âge de l'équipe
+     */
+    public function userMeetsAgeRestrictions(User $user, string $role = 'athlete'): bool
+    {
+        // Les coachs ne sont pas soumis aux restrictions d'âge
+        if ($role === 'coach' || in_array('ROLE_COACH', $user->getRoles())) {
+            return true;
+        }
+
+        return $user->meetsAgeRestrictions($this->minBirthYear, $this->maxBirthYear);
+    }
+
+    /**
+     * Retourne la tranche d'âge de l'équipe sous forme de chaîne lisible
+     */
+    #[Groups(['team:read', 'team:details'])]
+    public function getAgeRange(): ?string
+    {
+        if ($this->minBirthYear === null && $this->maxBirthYear === null) {
+            return null; // Pas de restriction d'âge
+        }
+
+        $currentYear = (int) date('Y');
+        
+        $minAge = $this->maxBirthYear ? $currentYear - $this->maxBirthYear : null;
+        $maxAge = $this->minBirthYear ? $currentYear - $this->minBirthYear : null;
+
+        if ($minAge && $maxAge) {
+            return $minAge . '-' . $maxAge . ' ans';
+        } elseif ($minAge) {
+            return $minAge . ' ans et plus';
+        } elseif ($maxAge) {
+            return 'jusqu\'à ' . $maxAge . ' ans';
+        }
+
+        return null;
+    }
+
+    /**
+     * Valide la cohérence des restrictions d'âge
+     */
+    public function validateAgeRestrictions(): array
+    {
+        $errors = [];
+
+        if ($this->minBirthYear !== null && $this->maxBirthYear !== null) {
+            if ($this->minBirthYear > $this->maxBirthYear) {
+                $errors[] = 'L\'année de naissance minimum ne peut pas être supérieure à l\'année de naissance maximum.';
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Retourne un message d'erreur personnalisé pour la restriction d'âge
+     */
+    public function getAgeRestrictionErrorMessage(User $user): ?string
+    {
+        $birthYear = $user->getBirthYear();
+        
+        if ($birthYear === null) {
+            return 'Une date de naissance est obligatoire pour rejoindre cette équipe.';
+        }
+
+        if ($this->maxBirthYear !== null && $birthYear > $this->maxBirthYear) {
+            $currentYear = (int) date('Y');
+            $maxAge = $currentYear - $this->maxBirthYear;
+            return "Vous êtes trop jeune pour cette équipe. Âge maximum : {$maxAge} ans.";
+        }
+
+        if ($this->minBirthYear !== null && $birthYear < $this->minBirthYear) {
+            $currentYear = (int) date('Y');
+            $minAge = $currentYear - $this->minBirthYear;
+            return "Vous êtes trop âgé pour cette équipe. Âge minimum : {$minAge} ans.";
+        }
+
+        return null;
+    }
+
+    /**
+     * Méthode de callback pour la validation des restrictions d'âge
+     */
+    public static function validateAgeRestrictionsCallback($object, \Symfony\Component\Validator\Context\ExecutionContextInterface $context, $payload)
+    {
+        if ($object instanceof Team) {
+            $errors = $object->validateAgeRestrictions();
+            
+            foreach ($errors as $error) {
+                $context->buildViolation($error)
+                    ->atPath('minBirthYear')
+                    ->addViolation();
+            }
+        }
     }
 } 

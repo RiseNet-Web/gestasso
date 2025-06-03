@@ -14,7 +14,6 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
-use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -49,7 +48,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     normalizationContext: ['groups' => ['user:read']],
     denormalizationContext: ['groups' => ['user:create']]
 )]
-class User implements UserInterface, PasswordAuthenticatedUserInterface
+class User implements UserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -67,12 +66,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:details'])]
     private array $roles = [];
 
-    #[ORM\Column]
-    #[Assert\NotBlank(message: 'Le mot de passe est obligatoire.')]
-    #[Assert\Length(min: 8, minMessage: 'Le mot de passe doit contenir au moins {{ limit }} caractères.')]
-    #[Groups(['user:create'])]
-    private ?string $password = null;
-
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank(message: 'Le prénom est obligatoire.')]
     #[Assert\Length(max: 100, maxMessage: 'Le prénom ne peut pas dépasser {{ limit }} caractères.')]
@@ -89,6 +82,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Assert\Regex(pattern: '/^[0-9+\-\s()]+$/', message: 'Le numéro de téléphone n\'est pas valide.')]
     #[Groups(['user:read', 'user:create', 'user:update', 'user:details'])]
     private ?string $phone = null;
+
+    #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true)]
+    #[Groups(['user:read', 'user:create', 'user:update', 'user:details'])]
+    private ?\DateTimeInterface $dateOfBirth = null;
 
     #[ORM\Column(length: 20, nullable: true)]
     #[Assert\Choice(choices: ['owner', 'member'], message: 'Le type d\'onboarding doit être "owner" ou "member".')]
@@ -153,6 +150,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(mappedBy: 'reviewedBy', targetEntity: JoinRequest::class)]
     private Collection $reviewedJoinRequests;
 
+    #[ORM\OneToMany(mappedBy: 'user', targetEntity: RefreshToken::class, cascade: ['remove'])]
+    private Collection $refreshTokens;
+
     public function __construct()
     {
         $this->ownedClubs = new ArrayCollection();
@@ -168,6 +168,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->userAuthentications = new ArrayCollection();
         $this->joinRequests = new ArrayCollection();
         $this->reviewedJoinRequests = new ArrayCollection();
+        $this->refreshTokens = new ArrayCollection();
     }
 
     #[ORM\PrePersist]
@@ -219,22 +220,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getPassword(): ?string
-    {
-        return $this->password;
-    }
-
-    public function setPassword(string $password): static
-    {
-        $this->password = $password;
-        return $this;
-    }
-
     public function eraseCredentials(): void
     {
-        // If you store any temporary, sensitive data on the user, clear it here
+        // Rien à effacer car pas de données sensibles stockées dans User
     }
-
+    
     public function getFirstName(): ?string
     {
         return $this->firstName;
@@ -265,6 +255,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setPhone(?string $phone): static
     {
         $this->phone = $phone;
+        return $this;
+    }
+
+    public function getDateOfBirth(): ?\DateTimeInterface
+    {
+        return $this->dateOfBirth;
+    }
+
+    public function setDateOfBirth(?\DateTimeInterface $dateOfBirth): static
+    {
+        $this->dateOfBirth = $dateOfBirth;
         return $this;
     }
 
@@ -327,6 +328,59 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getFullName(): string
     {
         return $this->firstName . ' ' . $this->lastName;
+    }
+
+    /**
+     * Calcule l'âge actuel de l'utilisateur
+     */
+    #[Groups(['user:read', 'user:details'])]
+    public function getAge(): ?int
+    {
+        if (!$this->dateOfBirth) {
+            return null;
+        }
+        
+        $now = new \DateTime();
+        $interval = $this->dateOfBirth->diff($now);
+        
+        return $interval->y;
+    }
+
+    /**
+     * Retourne l'année de naissance de l'utilisateur
+     */
+    #[Groups(['user:read', 'user:details'])]
+    public function getBirthYear(): ?int
+    {
+        if (!$this->dateOfBirth) {
+            return null;
+        }
+        
+        return (int) $this->dateOfBirth->format('Y');
+    }
+
+    /**
+     * Vérifie si l'utilisateur respecte les restrictions d'âge d'une équipe
+     */
+    public function meetsAgeRestrictions(?int $minBirthYear, ?int $maxBirthYear): bool
+    {
+        $birthYear = $this->getBirthYear();
+        
+        if ($birthYear === null) {
+            return false; // Pas de date de naissance
+        }
+        
+        // Vérifier la restriction d'âge minimum (maxBirthYear)
+        if ($maxBirthYear !== null && $birthYear > $maxBirthYear) {
+            return false; // Trop jeune
+        }
+        
+        // Vérifier la restriction d'âge maximum (minBirthYear)
+        if ($minBirthYear !== null && $birthYear < $minBirthYear) {
+            return false; // Trop âgé
+        }
+        
+        return true;
     }
 
     // Collection methods
@@ -618,6 +672,33 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function removeRole(string $role): static
     {
         $this->roles = array_diff($this->roles, [$role]);
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, RefreshToken>
+     */
+    public function getRefreshTokens(): Collection
+    {
+        return $this->refreshTokens;
+    }
+
+    public function addRefreshToken(RefreshToken $refreshToken): static
+    {
+        if (!$this->refreshTokens->contains($refreshToken)) {
+            $this->refreshTokens->add($refreshToken);
+            $refreshToken->setUser($this);
+        }
+        return $this;
+    }
+
+    public function removeRefreshToken(RefreshToken $refreshToken): static
+    {
+        if ($this->refreshTokens->removeElement($refreshToken)) {
+            if ($refreshToken->getUser() === $this) {
+                $refreshToken->setUser(null);
+            }
+        }
         return $this;
     }
 } 

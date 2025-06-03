@@ -38,6 +38,8 @@ class ProfileController extends AbstractController
             'lastName' => $user->getLastName(),
             'phoneNumber' => $user->getPhoneNumber(),
             'dateOfBirth' => $user->getDateOfBirth()?->format('Y-m-d'),
+            'age' => $user->getAge(),
+            'birthYear' => $user->getBirthYear(),
             'address' => $user->getAddress(),
             'city' => $user->getCity(),
             'postalCode' => $user->getPostalCode(),
@@ -49,12 +51,19 @@ class ProfileController extends AbstractController
             'onboardingCompleted' => $user->isOnboardingCompleted(),
             'onboardingType' => $user->getOnboardingType(),
             'createdAt' => $user->getCreatedAt()->format('c'),
-            'teams' => array_map(function ($membership) {
+            'teams' => array_map(function ($membership) use ($user) {
+                $team = $membership->getTeam();
                 return [
-                    'id' => $membership->getTeam()->getId(),
-                    'name' => $membership->getTeam()->getName(),
+                    'id' => $team->getId(),
+                    'name' => $team->getName(),
                     'role' => $membership->getRole(),
-                    'joinedAt' => $membership->getJoinedAt()->format('c')
+                    'joinedAt' => $membership->getJoinedAt()->format('c'),
+                    'ageRestrictions' => [
+                        'minBirthYear' => $team->getMinBirthYear(),
+                        'maxBirthYear' => $team->getMaxBirthYear(),
+                        'ageRange' => $team->getAgeRange(),
+                        'userMeetsRequirements' => $team->userMeetsAgeRestrictions($user)
+                    ]
                 ];
             }, $user->getTeamMemberships()->filter(fn($m) => $m->isActive())->toArray()),
             'managedClubs' => array_map(function ($manager) {
@@ -94,6 +103,8 @@ class ProfileController extends AbstractController
                 'lastName' => $user->getLastName(),
                 'phoneNumber' => $user->getPhoneNumber(),
                 'dateOfBirth' => $user->getDateOfBirth()?->format('Y-m-d'),
+                'age' => $user->getAge(),
+                'birthYear' => $user->getBirthYear(),
                 'address' => $user->getAddress(),
                 'city' => $user->getCity(),
                 'postalCode' => $user->getPostalCode(),

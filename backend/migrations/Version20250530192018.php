@@ -10,7 +10,7 @@ use Doctrine\Migrations\AbstractMigration;
 /**
  * Auto-generated Migration: Please modify to your needs!
  */
-final class Version20250527154630 extends AbstractMigration
+final class Version20250530192018 extends AbstractMigration
 {
     public function getDescription(): string
     {
@@ -87,10 +87,10 @@ final class Version20250527154630 extends AbstractMigration
             CREATE INDEX IDX_2B6ADBBA296CD8AE ON document_type (team_id)
         SQL);
         $this->addSql(<<<'SQL'
-            CREATE TABLE event (id SERIAL NOT NULL, team_id INT NOT NULL, created_by_id INT NOT NULL, title VARCHAR(255) NOT NULL, description TEXT DEFAULT NULL, total_budget NUMERIC(10, 2) NOT NULL, club_percentage NUMERIC(5, 2) NOT NULL, image_path VARCHAR(500) DEFAULT NULL, event_date TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, status VARCHAR(20) NOT NULL, PRIMARY KEY(id))
+            CREATE TABLE event (id SERIAL NOT NULL, club_id INT NOT NULL, created_by_id INT NOT NULL, title VARCHAR(255) NOT NULL, description TEXT DEFAULT NULL, total_budget NUMERIC(10, 2) NOT NULL, club_percentage NUMERIC(5, 2) NOT NULL, image_path VARCHAR(500) DEFAULT NULL, event_date TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, status VARCHAR(20) NOT NULL, PRIMARY KEY(id))
         SQL);
         $this->addSql(<<<'SQL'
-            CREATE INDEX IDX_3BAE0AA7296CD8AE ON event (team_id)
+            CREATE INDEX IDX_3BAE0AA761190A32 ON event (club_id)
         SQL);
         $this->addSql(<<<'SQL'
             CREATE INDEX IDX_3BAE0AA7B03A8386 ON event (created_by_id)
@@ -171,7 +171,7 @@ final class Version20250527154630 extends AbstractMigration
             CREATE INDEX IDX_F0E45BA961190A32 ON season (club_id)
         SQL);
         $this->addSql(<<<'SQL'
-            CREATE TABLE team (id SERIAL NOT NULL, club_id INT NOT NULL, season_id INT DEFAULT NULL, name VARCHAR(255) NOT NULL, description TEXT DEFAULT NULL, image_path VARCHAR(500) DEFAULT NULL, annual_price NUMERIC(10, 2) DEFAULT NULL, created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, is_active BOOLEAN NOT NULL, PRIMARY KEY(id))
+            CREATE TABLE team (id SERIAL NOT NULL, club_id INT NOT NULL, season_id INT DEFAULT NULL, name VARCHAR(255) NOT NULL, description TEXT DEFAULT NULL, image_path VARCHAR(500) DEFAULT NULL, annual_price NUMERIC(10, 2) DEFAULT NULL, gender VARCHAR(20) DEFAULT NULL, min_birth_year INT DEFAULT NULL, max_birth_year INT DEFAULT NULL, created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, is_active BOOLEAN NOT NULL, PRIMARY KEY(id))
         SQL);
         $this->addSql(<<<'SQL'
             CREATE INDEX IDX_C4E0A61F61190A32 ON team (club_id)
@@ -189,7 +189,7 @@ final class Version20250527154630 extends AbstractMigration
             CREATE INDEX IDX_6FFBDA1296CD8AE ON team_member (team_id)
         SQL);
         $this->addSql(<<<'SQL'
-            CREATE TABLE "user" (id SERIAL NOT NULL, email VARCHAR(180) NOT NULL, roles JSON NOT NULL, password VARCHAR(255) NOT NULL, first_name VARCHAR(100) NOT NULL, last_name VARCHAR(100) NOT NULL, phone VARCHAR(20) DEFAULT NULL, onboarding_type VARCHAR(20) DEFAULT NULL, onboarding_completed BOOLEAN NOT NULL, created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, is_active BOOLEAN NOT NULL, PRIMARY KEY(id))
+            CREATE TABLE "user" (id SERIAL NOT NULL, email VARCHAR(180) NOT NULL, roles JSON NOT NULL, password VARCHAR(255) NOT NULL, first_name VARCHAR(100) NOT NULL, last_name VARCHAR(100) NOT NULL, phone VARCHAR(20) DEFAULT NULL, date_of_birth DATE DEFAULT NULL, onboarding_type VARCHAR(20) DEFAULT NULL, onboarding_completed BOOLEAN NOT NULL, created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, is_active BOOLEAN NOT NULL, PRIMARY KEY(id))
         SQL);
         $this->addSql(<<<'SQL'
             CREATE UNIQUE INDEX UNIQ_8D93D649E7927C74 ON "user" (email)
@@ -252,7 +252,7 @@ final class Version20250527154630 extends AbstractMigration
             ALTER TABLE document_type ADD CONSTRAINT FK_2B6ADBBA296CD8AE FOREIGN KEY (team_id) REFERENCES team (id) NOT DEFERRABLE INITIALLY IMMEDIATE
         SQL);
         $this->addSql(<<<'SQL'
-            ALTER TABLE event ADD CONSTRAINT FK_3BAE0AA7296CD8AE FOREIGN KEY (team_id) REFERENCES team (id) NOT DEFERRABLE INITIALLY IMMEDIATE
+            ALTER TABLE event ADD CONSTRAINT FK_3BAE0AA761190A32 FOREIGN KEY (club_id) REFERENCES club (id) NOT DEFERRABLE INITIALLY IMMEDIATE
         SQL);
         $this->addSql(<<<'SQL'
             ALTER TABLE event ADD CONSTRAINT FK_3BAE0AA7B03A8386 FOREIGN KEY (created_by_id) REFERENCES "user" (id) NOT DEFERRABLE INITIALLY IMMEDIATE
@@ -365,7 +365,7 @@ final class Version20250527154630 extends AbstractMigration
             ALTER TABLE document_type DROP CONSTRAINT FK_2B6ADBBA296CD8AE
         SQL);
         $this->addSql(<<<'SQL'
-            ALTER TABLE event DROP CONSTRAINT FK_3BAE0AA7296CD8AE
+            ALTER TABLE event DROP CONSTRAINT FK_3BAE0AA761190A32
         SQL);
         $this->addSql(<<<'SQL'
             ALTER TABLE event DROP CONSTRAINT FK_3BAE0AA7B03A8386

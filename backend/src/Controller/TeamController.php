@@ -51,6 +51,10 @@ class TeamController extends AbstractController
                     'description' => $team->getDescription(),
                     'imagePath' => $team->getImagePath(),
                     'annualPrice' => $team->getAnnualPrice(),
+                    'gender' => $team->getGender(),
+                    'ageRange' => $team->getAgeRange(),
+                    'minBirthYear' => $team->getMinBirthYear(),
+                    'maxBirthYear' => $team->getMaxBirthYear(),
                     'season' => [
                         'id' => $team->getSeason()->getId(),
                         'name' => $team->getSeason()->getName(),
@@ -88,6 +92,20 @@ class TeamController extends AbstractController
         $team->setClub($club);
         $team->setAnnualPrice($data['annualPrice'] ?? 0);
 
+        // Nouveaux champs d'âge et restrictions
+        
+        if (isset($data['gender'])) {
+            $team->setGender($data['gender']);
+        }
+        
+        if (isset($data['minBirthYear'])) {
+            $team->setMinBirthYear($data['minBirthYear']);
+        }
+        
+        if (isset($data['maxBirthYear'])) {
+            $team->setMaxBirthYear($data['maxBirthYear']);
+        }
+
         // Récupérer la saison
         if (isset($data['seasonId'])) {
             $season = $this->entityManager->getRepository(Season::class)->find($data['seasonId']);
@@ -115,6 +133,10 @@ class TeamController extends AbstractController
             'name' => $team->getName(),
             'description' => $team->getDescription(),
             'annualPrice' => $team->getAnnualPrice(),
+            'gender' => $team->getGender(),
+            'minBirthYear' => $team->getMinBirthYear(),
+            'maxBirthYear' => $team->getMaxBirthYear(),
+            'ageRange' => $team->getAgeRange(),
             'clubId' => $team->getClub()->getId(),
             'seasonId' => $team->getSeason()->getId(),
             'createdAt' => $team->getCreatedAt()->format('c')
@@ -154,14 +176,23 @@ class TeamController extends AbstractController
                 'isActive' => $team->getSeason()->isActive()
             ],
             'members' => array_map(function (TeamMember $member) {
+                $userData = [
+                    'id' => $member->getUser()->getId(),
+                    'firstName' => $member->getUser()->getFirstName(),
+                    'lastName' => $member->getUser()->getLastName(),
+                    'email' => $member->getUser()->getEmail()
+                ];
+                
+                // Ajouter l'âge si date de naissance disponible
+                if ($member->getUser()->getDateOfBirth()) {
+                    $userData['age'] = $member->getUser()->getAge();
+                    $userData['birthYear'] = $member->getUser()->getBirthYear();
+                    $userData['dateOfBirth'] = $member->getUser()->getDateOfBirth()->format('Y-m-d');
+                }
+                
                 return [
                     'id' => $member->getId(),
-                    'user' => [
-                        'id' => $member->getUser()->getId(),
-                        'firstName' => $member->getUser()->getFirstName(),
-                        'lastName' => $member->getUser()->getLastName(),
-                        'email' => $member->getUser()->getEmail()
-                    ],
+                    'user' => $userData,
                     'role' => $member->getRole(),
                     'joinedAt' => $member->getJoinedAt()->format('c')
                 ];
@@ -169,6 +200,16 @@ class TeamController extends AbstractController
             'membersCount' => $members->count(),
             'athletesCount' => $members->filter(fn($m) => $m->getRole() === 'athlete')->count(),
             'coachesCount' => $members->filter(fn($m) => $m->getRole() === 'coach')->count(),
+            'category' => $team->getCategory(),
+            'gender' => $team->getGender(),
+            'maxMembers' => $team->getMaxMembers(),
+            'minBirthYear' => $team->getMinBirthYear(),
+            'maxBirthYear' => $team->getMaxBirthYear(),
+            'ageRange' => $team->getAgeRange(),
+            'ageRestrictions' => [
+                'hasRestrictions' => $team->getMinBirthYear() || $team->getMaxBirthYear(),
+                'message' => $team->getMinBirthYear() || $team->getMaxBirthYear() ? $team->getAgeRestrictionErrorMessage('', '') : null
+            ],
             'createdAt' => $team->getCreatedAt()->format('c'),
             'updatedAt' => $team->getUpdatedAt()->format('c')
         ]);
@@ -198,6 +239,23 @@ class TeamController extends AbstractController
         if (isset($data['annualPrice'])) {
             $team->setAnnualPrice($data['annualPrice']);
         }
+        
+        // Mise à jour des champs d'âge et restrictions
+        if (isset($data['category'])) {
+            $team->setCategory($data['category']);
+        }
+        
+        if (isset($data['gender'])) {
+            $team->setGender($data['gender']);
+        }
+        
+        if (isset($data['minBirthYear'])) {
+            $team->setMinBirthYear($data['minBirthYear']);
+        }
+        
+        if (isset($data['maxBirthYear'])) {
+            $team->setMaxBirthYear($data['maxBirthYear']);
+        }
 
         // Valider l'entité
         $errors = $this->validator->validate($team);
@@ -216,6 +274,12 @@ class TeamController extends AbstractController
             'name' => $team->getName(),
             'description' => $team->getDescription(),
             'annualPrice' => $team->getAnnualPrice(),
+            'category' => $team->getCategory(),
+            'gender' => $team->getGender(),
+            'maxMembers' => $team->getMaxMembers(),
+            'minBirthYear' => $team->getMinBirthYear(),
+            'maxBirthYear' => $team->getMaxBirthYear(),
+            'ageRange' => $team->getAgeRange(),
             'updatedAt' => $team->getUpdatedAt()->format('c')
         ]);
     }
