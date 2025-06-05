@@ -53,7 +53,7 @@ class User implements UserInterface
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['user:read', 'club:read', 'team:read', 'payment:read', 'event:read', 'document:read'])]
+    #[Groups(['user:read', 'club:read', 'team:read', 'document:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 180, unique: true)]
@@ -120,23 +120,8 @@ class User implements UserInterface
     #[ORM\OneToMany(mappedBy: 'user', targetEntity: TeamMember::class)]
     private Collection $teamMemberships;
 
-    #[ORM\OneToMany(mappedBy: 'user', targetEntity: Payment::class)]
-    private Collection $payments;
-
-    #[ORM\OneToMany(mappedBy: 'user', targetEntity: Cagnotte::class)]
-    private Collection $cagnottes;
-
-    #[ORM\OneToMany(mappedBy: 'createdBy', targetEntity: Event::class)]
-    private Collection $createdEvents;
-
-    #[ORM\OneToMany(mappedBy: 'user', targetEntity: EventParticipant::class)]
-    private Collection $eventParticipations;
-
     #[ORM\OneToMany(mappedBy: 'user', targetEntity: Document::class)]
     private Collection $documents;
-
-    #[ORM\OneToMany(mappedBy: 'validatedBy', targetEntity: Document::class)]
-    private Collection $validatedDocuments;
 
     #[ORM\OneToMany(mappedBy: 'user', targetEntity: Notification::class)]
     private Collection $notifications;
@@ -158,12 +143,7 @@ class User implements UserInterface
         $this->ownedClubs = new ArrayCollection();
         $this->clubManagers = new ArrayCollection();
         $this->teamMemberships = new ArrayCollection();
-        $this->payments = new ArrayCollection();
-        $this->cagnottes = new ArrayCollection();
-        $this->createdEvents = new ArrayCollection();
-        $this->eventParticipations = new ArrayCollection();
         $this->documents = new ArrayCollection();
-        $this->validatedDocuments = new ArrayCollection();
         $this->notifications = new ArrayCollection();
         $this->userAuthentications = new ArrayCollection();
         $this->joinRequests = new ArrayCollection();
@@ -461,114 +441,6 @@ class User implements UserInterface
         if ($this->teamMemberships->removeElement($teamMembership)) {
             if ($teamMembership->getUser() === $this) {
                 $teamMembership->setUser(null);
-            }
-        }
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, Payment>
-     */
-    public function getPayments(): Collection
-    {
-        return $this->payments;
-    }
-
-    public function addPayment(Payment $payment): static
-    {
-        if (!$this->payments->contains($payment)) {
-            $this->payments->add($payment);
-            $payment->setUser($this);
-        }
-        return $this;
-    }
-
-    public function removePayment(Payment $payment): static
-    {
-        if ($this->payments->removeElement($payment)) {
-            if ($payment->getUser() === $this) {
-                $payment->setUser(null);
-            }
-        }
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, Cagnotte>
-     */
-    public function getCagnottes(): Collection
-    {
-        return $this->cagnottes;
-    }
-
-    public function addCagnotte(Cagnotte $cagnotte): static
-    {
-        if (!$this->cagnottes->contains($cagnotte)) {
-            $this->cagnottes->add($cagnotte);
-            $cagnotte->setUser($this);
-        }
-        return $this;
-    }
-
-    public function removeCagnotte(Cagnotte $cagnotte): static
-    {
-        if ($this->cagnottes->removeElement($cagnotte)) {
-            if ($cagnotte->getUser() === $this) {
-                $cagnotte->setUser(null);
-            }
-        }
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, Event>
-     */
-    public function getCreatedEvents(): Collection
-    {
-        return $this->createdEvents;
-    }
-
-    public function addCreatedEvent(Event $createdEvent): static
-    {
-        if (!$this->createdEvents->contains($createdEvent)) {
-            $this->createdEvents->add($createdEvent);
-            $createdEvent->setCreatedBy($this);
-        }
-        return $this;
-    }
-
-    public function removeCreatedEvent(Event $createdEvent): static
-    {
-        if ($this->createdEvents->removeElement($createdEvent)) {
-            if ($createdEvent->getCreatedBy() === $this) {
-                $createdEvent->setCreatedBy(null);
-            }
-        }
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, EventParticipant>
-     */
-    public function getEventParticipations(): Collection
-    {
-        return $this->eventParticipations;
-    }
-
-    public function addEventParticipation(EventParticipant $eventParticipation): static
-    {
-        if (!$this->eventParticipations->contains($eventParticipation)) {
-            $this->eventParticipations->add($eventParticipation);
-            $eventParticipation->setUser($this);
-        }
-        return $this;
-    }
-
-    public function removeEventParticipation(EventParticipant $eventParticipation): static
-    {
-        if ($this->eventParticipations->removeElement($eventParticipation)) {
-            if ($eventParticipation->getUser() === $this) {
-                $eventParticipation->setUser(null);
             }
         }
         return $this;

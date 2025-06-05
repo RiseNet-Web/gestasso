@@ -20,4 +20,51 @@ class SeasonRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, Season::class);
     }
+
+    /**
+     * Trouve les saisons expirées avant la date donnée
+     * 
+     * @param \DateTimeInterface $cutoffDate Date limite (fin de saison + période de grâce)
+     * @return Season[]
+     */
+    public function findExpiredSeasons(\DateTimeInterface $cutoffDate): array
+    {
+        return $this->createQueryBuilder('s')
+            ->where('s.endDate < :cutoffDate')
+            ->andWhere('s.isActive = false')
+            ->setParameter('cutoffDate', $cutoffDate)
+            ->orderBy('s.endDate', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Trouve les saisons actives
+     * 
+     * @return Season[]
+     */
+    public function findActiveSeasons(): array
+    {
+        return $this->createQueryBuilder('s')
+            ->where('s.isActive = true')
+            ->orderBy('s.startDate', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Trouve la saison active pour un club donné
+     * 
+     * @param int $clubId
+     * @return Season|null
+     */
+    public function findActiveSeasonByClub(int $clubId): ?Season
+    {
+        return $this->createQueryBuilder('s')
+            ->where('s.club = :clubId')
+            ->andWhere('s.isActive = true')
+            ->setParameter('clubId', $clubId)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
 } 

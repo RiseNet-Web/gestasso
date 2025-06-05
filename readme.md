@@ -5,9 +5,7 @@
 Ce projet est organisé en monorepo avec les composants suivants :
 
 - **[Backend](./backend/)** - API REST en PHP 8.3
-- **[Frontend](./frontend/)** - Interface web Bootstrap 5  
-- **[Mobile](./mobile/)** - Application mobile React Native
-- **[Docs](./docs/)** - Documentation complète
+- **[Frontend](./frontend/)** - Interface web 
 - **[Infrastructure](./infrastructure/)** - Configuration Docker
 
 ## 🚀 Installation rapide

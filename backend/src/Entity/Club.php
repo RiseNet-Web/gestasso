@@ -50,7 +50,7 @@ class Club
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['club:read', 'team:read', 'user:details', 'event:read'])]
+    #[Groups(['club:read', 'team:read', 'user:details'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
@@ -106,23 +106,11 @@ class Club
     #[Groups(['club:details'])]
     private Collection $clubManagers;
 
-    #[ORM\OneToOne(mappedBy: 'club', cascade: ['persist', 'remove'])]
-    #[Groups(['club:details'])]
-    private ?ClubFinance $clubFinance = null;
-
-    #[ORM\OneToMany(mappedBy: 'club', targetEntity: ClubTransaction::class)]
-    private Collection $clubTransactions;
-
-    #[ORM\OneToMany(mappedBy: 'club', targetEntity: JoinRequest::class)]
-    private Collection $joinRequests;
-
     public function __construct()
     {
         $this->seasons = new ArrayCollection();
         $this->teams = new ArrayCollection();
         $this->clubManagers = new ArrayCollection();
-        $this->clubTransactions = new ArrayCollection();
-        $this->joinRequests = new ArrayCollection();
     }
 
     #[ORM\PrePersist]
@@ -326,50 +314,7 @@ class Club
         }
         return $this;
     }
-
-    public function getClubFinance(): ?ClubFinance
-    {
-        return $this->clubFinance;
-    }
-
-    public function setClubFinance(ClubFinance $clubFinance): static
-    {
-        // set the owning side of the relation if necessary
-        if ($clubFinance->getClub() !== $this) {
-            $clubFinance->setClub($this);
-        }
-
-        $this->clubFinance = $clubFinance;
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, ClubTransaction>
-     */
-    public function getClubTransactions(): Collection
-    {
-        return $this->clubTransactions;
-    }
-
-    public function addClubTransaction(ClubTransaction $clubTransaction): static
-    {
-        if (!$this->clubTransactions->contains($clubTransaction)) {
-            $this->clubTransactions->add($clubTransaction);
-            $clubTransaction->setClub($this);
-        }
-        return $this;
-    }
-
-    public function removeClubTransaction(ClubTransaction $clubTransaction): static
-    {
-        if ($this->clubTransactions->removeElement($clubTransaction)) {
-            if ($clubTransaction->getClub() === $this) {
-                $clubTransaction->setClub(null);
-            }
-        }
-        return $this;
-    }
-
+            
     // Helper methods
 
     /**

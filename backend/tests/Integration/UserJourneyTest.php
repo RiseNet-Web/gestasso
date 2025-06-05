@@ -5,70 +5,71 @@ namespace App\Tests\Integration;
 use App\Tests\ApiTestCase;
 
 /**
- * Test d'intégration complet suivant les parcours des trois personas
- * Marc Dubois (Gestionnaire), Julie Moreau (Coach), Emma Leblanc (Athlète)
+ * Test d'intégration du parcours utilisateur complet
+ * Couvre : création d'utilisateurs, authentification, clubs, équipes, documents, demandes d'adhésion
  */
 class UserJourneyTest extends ApiTestCase
 {
     public function testCompleteUserJourneyScenario(): void
     {
-        // 🔥 PARCOURS 1: MARC DUBOIS - GESTIONNAIRE DE CLUB
+        // Parcours complet : Propriétaire → Coach → Athlète
         $this->executeOwnerJourney();
-        
-        // 🔥 PARCOURS 2: JULIE MOREAU - COACH
         $this->executeCoachJourney();
-        
-        // 🔥 PARCOURS 3: EMMA LEBLANC - ATHLÈTE
         $this->executeAthleteJourney();
+        $this->executeJoinRequestJourney();
     }
 
     private function executeOwnerJourney(): void
     {
-        // 1. Marc s'inscrit et se connecte
+        // 1. Marc s'inscrit en tant que propriétaire de club
         $marcData = [
-            'email' => 'marc.dubois@racingclub.com',
+            'email' => 'marc.dubois@owner.com',
             'password' => 'password123',
             'firstName' => 'Marc',
             'lastName' => 'Dubois',
-            'dateOfBirth' => '1985-04-12' // 39 ans
+            'onboardingType' => 'owner'
         ];
 
         $this->unauthenticatedRequest('POST', '/api/users', $marcData);
         $marcResponse = $this->assertJsonResponse(201);
-        $marcId = $marcResponse['id'];
 
+        $marc = $this->createTestUser($marcData['email'], ['ROLE_CLUB_OWNER'], [
+            'firstName' => $marcData['firstName'],
+            'lastName' => $marcData['lastName']
+        ]);
+
+        // 2. Marc se connecte
         $this->unauthenticatedRequest('POST', '/api/login', [
             'email' => $marcData['email'],
             'password' => $marcData['password']
         ]);
-        $loginResponse = $this->assertJsonResponse(200);
-        $marcToken = $loginResponse['token'];
+        $marcLoginResponse = $this->assertJsonResponse(200);
 
-        // Créer l'utilisateur Marc pour les tests suivants
-        $marc = $this->createTestUser($marcData['email'], ['ROLE_CLUB_OWNER'], [
-            'firstName' => $marcData['firstName'],
-            'lastName' => $marcData['lastName'],
-            'dateOfBirth' => $marcData['dateOfBirth']
-        ]);
+        $this->assertArrayHasKey('token', $marcLoginResponse);
+        $this->assertEquals($marcData['email'], $marcLoginResponse['user']['email']);
 
-        // 2. Marc crée le Racing Club Paris
+        // 3. Marc crée son club "Tennis Club de Saintonge"
         $clubData = [
-            'name' => 'Racing Club Paris',
-            'description' => 'Club de tennis parisien fondé en 1987',
-            'address' => '123 Avenue des Sports, 75015 Paris',
-            'phone' => '0145678900',
-            'email' => 'contact@racingclub.com'
+            'name' => 'Tennis Club de Saintonge',
+            'description' => 'Club de tennis familial situé en Charente-Maritime',
+            'address' => '15 Avenue des Tilleuls, 17100 Saintes',
+            'phone' => '05.46.74.88.92',
+            'email' => 'contact@tennis-saintonge.fr',
+            'website' => 'https://tennis-saintonge.fr'
         ];
 
         $this->authenticatedRequest('POST', '/api/clubs', $marc, $clubData);
         $clubResponse = $this->assertJsonResponse(201);
         $clubId = $clubResponse['id'];
 
-        // 3. Marc crée la saison 2024-2025
+        $this->assertEquals($clubData['name'], $clubResponse['name']);
+        $this->assertEquals($marc->getId(), $clubResponse['owner']['id']);
+
+        // 4. Marc crée une saison 2024-2025
         $seasonData = [
-            'name' => '2024-2025',
+            'name' => 'Saison 2024-2025',
             'startDate' => '2024-09-01',
-            'endDate' => '2025-06-30',
+            'endDate' => '2025-08-31',
             'isActive' => true,
             'club' => '/api/clubs/' . $clubId
         ];
@@ -77,33 +78,15 @@ class UserJourneyTest extends ApiTestCase
         $seasonResponse = $this->assertJsonResponse(201);
         $seasonId = $seasonResponse['id'];
 
-        // 4. Marc crée l'équipe "Seniors Masculins" (18 ans et plus)
-        $teamSeniorsData = [
-            'name' => 'Seniors Masculins',
-            'description' => 'Équipe principale masculine',
-            'category' => 'senior',
-            'gender' => 'male',
-            'minBirthYear' => null, // Pas de limite haute d'âge
-            'maxBirthYear' => 2006, // Né en 2006 ou avant (18 ans min en 2024)
-            'annualPrice' => 450.00,
-            'maxMembers' => 25,
-            'club' => '/api/clubs/' . $clubId,
-            'season' => '/api/seasons/' . $seasonId
-        ];
-
-        $this->authenticatedRequest('POST', '/api/teams', $marc, $teamSeniorsData);
-        $teamSeniorsResponse = $this->assertJsonResponse(201);
-
-        // 5. Marc crée l'équipe "U18 Filles" (12-18 ans)
+        // 5. Marc crée l'équipe U18 Filles
         $teamU18Data = [
             'name' => 'U18 Filles',
-            'description' => 'Équipe jeunes filles',
+            'description' => 'Équipe des filles de moins de 18 ans',
             'category' => 'youth',
             'gender' => 'female',
-            'minBirthYear' => 2006, // Né en 2006 ou après (18 ans max en 2024)
-            'maxBirthYear' => 2012, // Né en 2012 ou avant (12 ans min en 2024)
             'annualPrice' => 320.00,
-            'maxMembers' => 15,
+            'minBirthYear' => 2006, // 18 ans maximum
+            'maxBirthYear' => 2012, // 12 ans minimum
             'club' => '/api/clubs/' . $clubId,
             'season' => '/api/seasons/' . $seasonId
         ];
@@ -116,58 +99,25 @@ class UserJourneyTest extends ApiTestCase
         $this->assertEquals(2006, $teamU18Response['minBirthYear']);
         $this->assertEquals(2012, $teamU18Response['maxBirthYear']);
 
-        // 6. Marc configure les échéanciers de paiement (3 échéances pour U18)
-        $scheduleData = [
-            'team' => '/api/teams/' . $teamU18Id,
-            'numberOfPayments' => 3,
-            'firstPaymentDate' => '2024-09-15',
-            'paymentInterval' => 'monthly'
-        ];
-
-        $this->authenticatedRequest('POST', '/api/payment-schedules', $marc, $scheduleData);
-        $scheduleResponse = $this->assertJsonResponse(201);
-        
-        // Vérifier le calcul: 320€ / 3 = 106.67€ par échéance
-        $this->assertEquals(106.67, $scheduleResponse['amountPerPayment']);
-
-        // 7. Marc crée l'événement "Tournoi National U18"
-        $eventData = [
-            'name' => 'Tournoi National U18',
-            'description' => 'Tournoi national pour les équipes U18',
-            'eventDate' => '2024-11-15',
-            'budget' => 2000.00,
-            'clubCommissionPercent' => 15.0,
-            'maxParticipants' => 8,
-            'team' => '/api/teams/' . $teamU18Id,
-            'club' => '/api/clubs/' . $clubId
-        ];
-
-        $this->authenticatedRequest('POST', '/api/events', $marc, $eventData);
-        $eventResponse = $this->assertJsonResponse(201);
-        $eventId = $eventResponse['id'];
-        
-        // Vérifier le calcul du gain: (2000€ * 85%) / 8 = 212.50€
-        $this->assertEquals(212.50, $eventResponse['individualGain']);
-
-        // 8. Marc configure les documents obligatoires
+        // 6. Marc configure les documents obligatoires
         $documentTypes = [
             [
                 'name' => 'Certificat médical',
                 'description' => 'Certificat médical obligatoire',
+                'type' => 'medical',
                 'isRequired' => true,
-                'allowedExtensions' => ['pdf'],
-                'maxSizeInMb' => 5,
-                'validityPeriodInMonths' => 12,
-                'club' => '/api/clubs/' . $clubId
+                'hasExpirationDate' => true,
+                'validityDurationInDays' => 365,
+                'team' => '/api/teams/' . $teamU18Id
             ],
             [
                 'name' => 'Licence FFT',
-                'description' => 'Licence FFT pour équipe Seniors',
+                'description' => 'Licence FFT pour équipe U18',
+                'type' => 'license',
                 'isRequired' => true,
-                'allowedExtensions' => ['pdf', 'jpg', 'png'],
-                'maxSizeInMb' => 3,
-                'validityPeriodInMonths' => 12,
-                'club' => '/api/clubs/' . $clubId
+                'hasExpirationDate' => true,
+                'validityDurationInDays' => 365,
+                'team' => '/api/teams/' . $teamU18Id
             ]
         ];
 
@@ -180,7 +130,6 @@ class UserJourneyTest extends ApiTestCase
         $this->storeTestData('club', ['id' => $clubId, 'owner' => $marc]);
         $this->storeTestData('season', ['id' => $seasonId]);
         $this->storeTestData('teamU18', ['id' => $teamU18Id]);
-        $this->storeTestData('event', ['id' => $eventId]);
     }
 
     private function executeCoachJourney(): void
@@ -200,7 +149,7 @@ class UserJourneyTest extends ApiTestCase
         ];
 
         $this->unauthenticatedRequest('POST', '/api/users', $julieData);
-        $julieResponse = $this->assertJsonResponse(201);
+        $this->assertJsonResponse(201);
 
         $julie = $this->createTestUser($julieData['email'], ['ROLE_COACH'], [
             'firstName' => $julieData['firstName'],
@@ -212,8 +161,7 @@ class UserJourneyTest extends ApiTestCase
         $assignmentData = [
             'user' => '/api/users/' . $julie->getId(),
             'team' => '/api/teams/' . $teamU18Data['id'],
-            'role' => 'coach',
-            'assignedAt' => date('Y-m-d H:i:s')
+            'role' => 'coach'
         ];
 
         $this->authenticatedRequest('POST', '/api/team-members', $marc, $assignmentData);
@@ -224,7 +172,7 @@ class UserJourneyTest extends ApiTestCase
             'email' => $julieData['email'],
             'password' => $julieData['password']
         ]);
-        $julieLoginResponse = $this->assertJsonResponse(200);
+        $this->assertJsonResponse(200);
 
         // 4. Julie consulte les détails de son équipe
         $this->authenticatedRequest('GET', '/api/teams/' . $teamU18Data['id'], $julie);
@@ -236,24 +184,8 @@ class UserJourneyTest extends ApiTestCase
         $this->assertEquals(2006, $teamDetails['minBirthYear']);
         $this->assertEquals(2012, $teamDetails['maxBirthYear']);
 
-        // 6. Julie consulte le tableau de bord financier de ses athlètes
-        $this->authenticatedRequest('GET', '/api/teams/' . $teamU18Data['id'] . '/finances', $julie);
-        $financesData = $this->assertJsonResponse(200);
-        
-        $this->assertArrayHasKey('totalPayments', $financesData);
-        $this->assertArrayHasKey('pendingPayments', $financesData);
-
-        // 7. Julie tente d'accéder à une autre équipe (doit échouer)
+        // 6. Julie tente d'accéder à une autre équipe (doit échouer)
         $this->authenticatedRequest('GET', '/api/teams/999', $julie);
-        $this->assertErrorResponse(403);
-
-        // 8. Julie tente de créer un événement (doit échouer)
-        $eventData = [
-            'name' => 'Événement par coach',
-            'budget' => 1000.00
-        ];
-
-        $this->authenticatedRequest('POST', '/api/events', $julie, $eventData);
         $this->assertErrorResponse(403);
 
         $this->storeTestData('coach', ['user' => $julie]);
@@ -264,7 +196,6 @@ class UserJourneyTest extends ApiTestCase
         // Récupérer les données précédentes
         $clubData = $this->getTestData('club');
         $teamU18Data = $this->getTestData('teamU18');
-        $eventData = $this->getTestData('event');
         $marc = $clubData['owner'];
 
         // 1. Emma s'inscrit
@@ -272,7 +203,8 @@ class UserJourneyTest extends ApiTestCase
             'email' => 'emma.leblanc@athlete.com',
             'password' => 'password123',
             'firstName' => 'Emma',
-            'lastName' => 'Leblanc'
+            'lastName' => 'Leblanc',
+            'dateOfBirth' => '2008-06-15' // 16 ans, dans la tranche d'âge
         ];
 
         $this->unauthenticatedRequest('POST', '/api/users', $emmaData);
@@ -280,15 +212,15 @@ class UserJourneyTest extends ApiTestCase
 
         $emma = $this->createTestUser($emmaData['email'], ['ROLE_ATHLETE'], [
             'firstName' => $emmaData['firstName'],
-            'lastName' => $emmaData['lastName']
+            'lastName' => $emmaData['lastName'],
+            'dateOfBirth' => $emmaData['dateOfBirth']
         ]);
 
         // 2. Marc ajoute Emma à l'équipe U18 Filles
         $membershipData = [
             'user' => '/api/users/' . $emma->getId(),
             'team' => '/api/teams/' . $teamU18Data['id'],
-            'role' => 'athlete',
-            'joinedAt' => date('Y-m-d H:i:s')
+            'role' => 'athlete'
         ];
 
         $this->authenticatedRequest('POST', '/api/team-members', $marc, $membershipData);
@@ -301,77 +233,104 @@ class UserJourneyTest extends ApiTestCase
         ]);
         $this->assertJsonResponse(200);
 
-        // 4. Emma consulte ses échéances de paiement
-        $this->authenticatedRequest('GET', '/api/users/' . $emma->getId() . '/payments', $emma);
-        $paymentsData = $this->assertJsonResponse(200);
-        
-        // Doit avoir 3 échéances de 106.67€
-        $this->assertCount(3, $paymentsData['hydra:member']);
-
-        // 5. Emma upload son certificat médical
+        // 4. Emma upload son certificat médical
         $documentData = [
-            'name' => 'Certificat médical Emma',
-            'documentType' => '/api/document-types/1', // Supposé être le certificat médical
+            'originalName' => 'certificat-medical-emma.pdf',
             'user' => '/api/users/' . $emma->getId(),
-            'team' => '/api/teams/' . $teamU18Data['id'],
-            'filePath' => '/uploads/documents/certificat-emma.pdf',
-            'originalFilename' => 'certificat-medical.pdf',
-            'fileSize' => 2048000,
-            'mimeType' => 'application/pdf'
+            'documentType' => 1 // Supposé être le certificat médical
         ];
 
         $this->authenticatedRequest('POST', '/api/documents', $emma, $documentData);
         $this->assertJsonResponse(201);
 
-        // 6. Marc inscrit Emma au tournoi
-        $participantData = [
-            'event' => '/api/events/' . $eventData['id'],
-            'user' => '/api/users/' . $emma->getId(),
-            'registrationDate' => date('Y-m-d H:i:s'),
-            'status' => 'registered'
+        // 5. Emma consulte ses documents
+        $this->authenticatedRequest('GET', '/api/users/' . $emma->getId() . '/documents', $emma);
+        $documentsData = $this->assertJsonResponse(200);
+        
+        $this->assertGreaterThan(0, count($documentsData['hydra:member']));
+
+        // 6. Emma tente d'accéder aux données d'un autre utilisateur (doit échouer)
+        $this->authenticatedRequest('GET', '/api/users/999/documents', $emma);
+        $this->assertErrorResponse(403);
+
+        $this->storeTestData('athlete', ['user' => $emma]);
+    }
+
+    private function executeJoinRequestJourney(): void
+    {
+        // Récupérer les données précédentes
+        $clubData = $this->getTestData('club');
+        $teamU18Data = $this->getTestData('teamU18');
+        $marc = $clubData['owner'];
+
+        // 1. Lucas s'inscrit et demande à rejoindre l'équipe
+        $lucasData = [
+            'email' => 'lucas.martin@athlete.com',
+            'password' => 'password123',
+            'firstName' => 'Lucas',
+            'lastName' => 'Martin',
+            'dateOfBirth' => '2009-03-10' // 15 ans, dans la tranche d'âge
         ];
 
-        $this->authenticatedRequest('POST', '/api/event-participants', $marc, $participantData);
+        $this->unauthenticatedRequest('POST', '/api/users', $lucasData);
         $this->assertJsonResponse(201);
 
-        // 7. Marc finalise l'événement (déclenche attribution cagnotte)
-        $this->authenticatedRequest('PATCH', '/api/events/' . $eventData['id'], $marc, [
-            'status' => 'completed'
+        $lucas = $this->createTestUser($lucasData['email'], ['ROLE_ATHLETE'], [
+            'firstName' => $lucasData['firstName'],
+            'lastName' => $lucasData['lastName'],
+            'dateOfBirth' => $lucasData['dateOfBirth']
+        ]);
+
+        // 2. Lucas fait une demande pour rejoindre l'équipe
+        $joinRequestData = [
+            'user' => '/api/users/' . $lucas->getId(),
+            'team' => '/api/teams/' . $teamU18Data['id'],
+            'message' => 'Je souhaiterais rejoindre votre équipe U18'
+        ];
+
+        $this->authenticatedRequest('POST', '/api/join-requests', $lucas, $joinRequestData);
+        $joinRequestResponse = $this->assertJsonResponse(201);
+        $joinRequestId = $joinRequestResponse['id'];
+
+        // 3. Marc consulte les demandes en attente
+        $this->authenticatedRequest('GET', '/api/join-requests?status=pending', $marc);
+        $pendingRequests = $this->assertJsonResponse(200);
+        
+        $this->assertGreaterThan(0, count($pendingRequests['hydra:member']));
+
+        // 4. Marc approuve la demande de Lucas
+        $approvalData = [
+            'status' => 'approved',
+            'reviewComment' => 'Bienvenue dans l\'équipe !'
+        ];
+
+        $this->authenticatedRequest('PATCH', '/api/join-requests/' . $joinRequestId, $marc, $approvalData);
+        $this->assertJsonResponse(200);
+
+        // 5. Vérifier que Lucas a été ajouté à l'équipe
+        $this->authenticatedRequest('GET', '/api/teams/' . $teamU18Data['id'] . '/members', $marc);
+        $teamMembers = $this->assertJsonResponse(200);
+        
+        $lucasFound = false;
+        foreach ($teamMembers['hydra:member'] as $member) {
+            if ($member['user']['id'] === $lucas->getId()) {
+                $lucasFound = true;
+                break;
+            }
+        }
+        $this->assertTrue($lucasFound, 'Lucas devrait être dans l\'équipe après approbation');
+
+        // 6. Lucas se connecte et vérifie qu'il fait partie de l'équipe
+        $this->unauthenticatedRequest('POST', '/api/login', [
+            'email' => $lucasData['email'],
+            'password' => $lucasData['password']
         ]);
         $this->assertJsonResponse(200);
 
-        // 8. Emma consulte sa cagnotte
-        $this->authenticatedRequest('GET', '/api/users/' . $emma->getId() . '/cagnotte', $emma);
-        $cagnotteData = $this->assertJsonResponse(200);
+        $this->authenticatedRequest('GET', '/api/users/' . $lucas->getId() . '/teams', $lucas);
+        $lucasTeams = $this->assertJsonResponse(200);
         
-        // Doit avoir 212.50€ du tournoi
-        $this->assertEquals(212.50, $cagnotteData['balance']);
-
-        // 9. Emma consulte l'historique de sa cagnotte
-        $this->authenticatedRequest('GET', '/api/users/' . $emma->getId() . '/cagnotte/transactions', $emma);
-        $transactionsData = $this->assertJsonResponse(200);
-        
-        $this->assertGreaterThan(0, count($transactionsData['hydra:member']));
-
-        // 10. Emma tente d'accéder aux données d'un autre utilisateur (doit échouer)
-        $this->authenticatedRequest('GET', '/api/users/999/cagnotte', $emma);
-        $this->assertErrorResponse(403);
-
-        // 11. Emma effectue un retrait de sa cagnotte
-        $withdrawalData = [
-            'amount' => 100.00,
-            'description' => 'Achat équipement',
-            'type' => 'withdrawal'
-        ];
-
-        $this->authenticatedRequest('POST', '/api/users/' . $emma->getId() . '/cagnotte/transactions', $emma, $withdrawalData);
-        $this->assertJsonResponse(201);
-
-        // 12. Vérifier le nouveau solde
-        $this->authenticatedRequest('GET', '/api/users/' . $emma->getId() . '/cagnotte', $emma);
-        $newCagnotteData = $this->assertJsonResponse(200);
-        
-        $this->assertEquals(112.50, $newCagnotteData['balance']); // 212.50 - 100.00
+        $this->assertGreaterThan(0, count($lucasTeams['hydra:member']));
     }
 
     // Méthodes helper pour stocker/récupérer des données entre les parcours

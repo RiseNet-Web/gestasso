@@ -5,7 +5,7 @@ namespace App\Enum;
 enum DocumentStatus: string
 {
     case PENDING = 'pending';
-    case VALIDATED = 'validated';
+    case APPROVED = 'approved';
     case REJECTED = 'rejected';
     case EXPIRED = 'expired';
 
@@ -13,7 +13,7 @@ enum DocumentStatus: string
     {
         return match($this) {
             self::PENDING => 'En attente',
-            self::VALIDATED => 'Validé',
+            self::APPROVED => 'Approuvé',
             self::REJECTED => 'Rejeté',
             self::EXPIRED => 'Expiré',
         };

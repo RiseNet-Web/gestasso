@@ -188,6 +188,21 @@ class DocumentRepository extends ServiceEntityRepository
     }
 
     /**
+     * Trouve tous les documents d'une saison expirée
+     */
+    public function findByExpiredSeason($season): array
+    {
+        return $this->createQueryBuilder('d')
+            ->join('d.documentType', 'dt')
+            ->join('dt.team', 't')
+            ->where('t.season = :season')
+            ->setParameter('season', $season)
+            ->orderBy('d.createdAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Trouve les documents manquants pour un utilisateur dans une équipe
      */
     public function findMissingDocuments(User $user, Team $team): array

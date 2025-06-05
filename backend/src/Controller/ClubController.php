@@ -7,6 +7,8 @@ use App\Entity\User;
 use App\Entity\ClubManager;
 use App\Entity\Season;
 use App\Security\ClubVoter;
+use App\Service\ClubService;
+use App\Service\ImageService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -23,7 +25,9 @@ class ClubController extends AbstractController
 {
     public function __construct(
         private EntityManagerInterface $entityManager,
-        private ValidatorInterface $validator
+        private ValidatorInterface $validator,
+        private ClubService $clubService,
+        private ImageService $imageService
     ) {}
 
     #[Route('', name: 'api_clubs_list', methods: ['GET'])]
@@ -82,7 +86,7 @@ class ClubController extends AbstractController
                 'id' => $club->getId(),
                 'name' => $club->getName(),
                 'description' => $club->getDescription(),
-                'imagePath' => $club->getImagePath(),
+                'imagePath' => $this->imageService->getImageUrl($club->getImagePath()),
                 'isPublic' => $club->isPublic(),
                 'allowJoinRequests' => $club->isAllowJoinRequests(),
                 'isOwner' => $club->getOwner() === $user,
@@ -183,7 +187,7 @@ class ClubController extends AbstractController
                 'id' => $club->getId(),
                 'name' => $club->getName(),
                 'description' => $club->getDescription(),
-                'imagePath' => $club->getImagePath(),
+                'imagePath' => $this->imageService->getImageUrl($club->getImagePath()),
                 'createdAt' => $club->getCreatedAt()->format('c')
             ];
         }
@@ -200,6 +204,47 @@ class ClubController extends AbstractController
 
     #[Route('', name: 'api_clubs_create', methods: ['POST'])]
     #[IsGranted('ROLE_CLUB_OWNER')]
+    #[OA\Post(
+        path: '/api/clubs',
+        summary: 'Créer un nouveau club',
+        description: 'Crée un nouveau club avec possibilité d\'uploader un logo',
+        tags: ['Clubs'],
+        security: [['JWT' => []]]
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\MediaType(
+            mediaType: 'multipart/form-data',
+            schema: new OA\Schema(
+                type: 'object',
+                required: ['name'],
+                properties: [
+                    new OA\Property(property: 'name', type: 'string', description: 'Nom du club'),
+                    new OA\Property(property: 'description', type: 'string', description: 'Description du club'),
+                    new OA\Property(property: 'isPublic', type: 'boolean', description: 'Club public'),
+                    new OA\Property(property: 'allowJoinRequests', type: 'boolean', description: 'Autorise les demandes d\'adhésion'),
+                    new OA\Property(property: 'logo', type: 'string', format: 'binary', description: 'Logo du club')
+                ]
+            )
+        )
+    )]
+    #[OA\Response(
+        response: 201,
+        description: 'Club créé avec succès',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'id', type: 'integer'),
+                new OA\Property(property: 'name', type: 'string'),
+                new OA\Property(property: 'description', type: 'string'),
+                new OA\Property(property: 'imagePath', type: 'string', nullable: true),
+                new OA\Property(property: 'isPublic', type: 'boolean'),
+                new OA\Property(property: 'allowJoinRequests', type: 'boolean'),
+                new OA\Property(property: 'createdAt', type: 'string', format: 'date-time')
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Données invalides')]
+    #[OA\Response(response: 401, description: 'Non authentifié')]
     public function create(Request $request): JsonResponse
     {
         $user = $this->getUser();
@@ -208,56 +253,58 @@ class ClubController extends AbstractController
             return new JsonResponse(['error' => 'Utilisateur non trouvé'], Response::HTTP_NOT_FOUND);
         }
 
-        $data = json_decode($request->getContent(), true);
+        // Récupérer les données du formulaire
+        $name = $request->request->get('name');
+        $description = $request->request->get('description');
+        $isPublic = $request->request->getBoolean('isPublic', true);
+        $allowJoinRequests = $request->request->getBoolean('allowJoinRequests', true);
+        $logoFile = $request->files->get('logo');
 
-        if (!isset($data['name']) || empty($data['name'])) {
+        if (empty($name)) {
             return new JsonResponse(['error' => 'Le nom du club est requis'], Response::HTTP_BAD_REQUEST);
         }
 
-        $club = new Club();
-        $club->setName($data['name'])
-             ->setDescription($data['description'] ?? null)
-             ->setOwner($user)
-             ->setIsPublic($data['isPublic'] ?? true)
-             ->setAllowJoinRequests($data['allowJoinRequests'] ?? true);
+        $data = [
+            'name' => $name,
+            'description' => $description,
+            'isPublic' => $isPublic,
+            'allowJoinRequests' => $allowJoinRequests
+        ];
 
-        $errors = $this->validator->validate($club);
-        if (count($errors) > 0) {
-            $errorMessages = [];
-            foreach ($errors as $error) {
-                $errorMessages[] = $error->getMessage();
-            }
-            return new JsonResponse(['errors' => $errorMessages], Response::HTTP_BAD_REQUEST);
-        }
+        try {
+            $club = $this->clubService->createClub($user, $data, $logoFile);
 
-        $this->entityManager->persist($club);
+            // Créer une saison par défaut
+            $currentYear = date('Y');
+            $season = new Season();
+            $season->setName("Saison {$currentYear}-" . ($currentYear + 1))
+                   ->setStartDate(new \DateTime("{$currentYear}-09-01"))
+                   ->setEndDate(new \DateTime(($currentYear + 1) . "-08-31"))
+                   ->setClub($club)
+                   ->setIsActive(true);
 
-        // Créer une saison par défaut
-        $currentYear = date('Y');
-        $season = new Season();
-        $season->setName("Saison {$currentYear}-" . ($currentYear + 1))
-               ->setStartDate(new \DateTime("{$currentYear}-09-01"))
-               ->setEndDate(new \DateTime(($currentYear + 1) . "-08-31"))
-               ->setClub($club)
-               ->setIsActive(true);
-
-        $this->entityManager->persist($season);
-        $this->entityManager->flush();
-
-        // Marquer l'onboarding comme terminé si c'était un owner
-        if ($user->getOnboardingType() === 'owner' && !$user->isOnboardingCompleted()) {
-            $user->setOnboardingCompleted(true);
+            $this->entityManager->persist($season);
             $this->entityManager->flush();
-        }
 
-        return new JsonResponse([
-            'id' => $club->getId(),
-            'name' => $club->getName(),
-            'description' => $club->getDescription(),
-            'isPublic' => $club->isPublic(),
-            'allowJoinRequests' => $club->isAllowJoinRequests(),
-            'createdAt' => $club->getCreatedAt()->format('c')
-        ], Response::HTTP_CREATED);
+            // Marquer l'onboarding comme terminé si c'était un owner
+            if ($user->getOnboardingType() === 'owner' && !$user->isOnboardingCompleted()) {
+                $user->setOnboardingCompleted(true);
+                $this->entityManager->flush();
+            }
+
+            return new JsonResponse([
+                'id' => $club->getId(),
+                'name' => $club->getName(),
+                'description' => $club->getDescription(),
+                'imagePath' => $this->imageService->getImageUrl($club->getImagePath()),
+                'isPublic' => $club->isPublic(),
+                'allowJoinRequests' => $club->isAllowJoinRequests(),
+                'createdAt' => $club->getCreatedAt()->format('c')
+            ], Response::HTTP_CREATED);
+
+        } catch (\InvalidArgumentException $e) {
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
     }
 
     #[Route('/{id}', name: 'api_clubs_show', methods: ['GET'])]
@@ -279,7 +326,7 @@ class ClubController extends AbstractController
             'id' => $club->getId(),
             'name' => $club->getName(),
             'description' => $club->getDescription(),
-            'imagePath' => $club->getImagePath(),
+            'imagePath' => $this->imageService->getImageUrl($club->getImagePath()),
             'isPublic' => $club->isPublic(),
             'allowJoinRequests' => $club->isAllowJoinRequests(),
             'owner' => [
@@ -305,38 +352,88 @@ class ClubController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
-        if (isset($data['name'])) {
-            $club->setName($data['name']);
+        try {
+            $updatedClub = $this->clubService->updateClub($club, $data);
+
+            return new JsonResponse([
+                'id' => $updatedClub->getId(),
+                'name' => $updatedClub->getName(),
+                'description' => $updatedClub->getDescription(),
+                'imagePath' => $this->imageService->getImageUrl($updatedClub->getImagePath()),
+                'isPublic' => $updatedClub->isPublic(),
+                'allowJoinRequests' => $updatedClub->isAllowJoinRequests(),
+                'updatedAt' => $updatedClub->getUpdatedAt()->format('c')
+            ]);
+
+        } catch (\InvalidArgumentException $e) {
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
-        if (isset($data['description'])) {
-            $club->setDescription($data['description']);
-        }
-        if (isset($data['isPublic'])) {
-            $club->setIsPublic($data['isPublic']);
-        }
-        if (isset($data['allowJoinRequests'])) {
-            $club->setAllowJoinRequests($data['allowJoinRequests']);
+    }
+
+    #[Route('/{id}/logo', name: 'api_clubs_upload_logo', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/clubs/{id}/logo',
+        summary: 'Upload du logo du club',
+        description: 'Upload ou mise à jour du logo d\'un club',
+        tags: ['Clubs'],
+        security: [['JWT' => []]]
+    )]
+    #[OA\Parameter(
+        name: 'id',
+        in: 'path',
+        description: 'ID du club',
+        required: true,
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\MediaType(
+            mediaType: 'multipart/form-data',
+            schema: new OA\Schema(
+                type: 'object',
+                required: ['logo'],
+                properties: [
+                    new OA\Property(property: 'logo', type: 'string', format: 'binary', description: 'Fichier logo du club')
+                ]
+            )
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Logo uploadé avec succès',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'imagePath', type: 'string', description: 'URL du logo uploadé'),
+                new OA\Property(property: 'message', type: 'string', description: 'Message de confirmation')
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Erreur lors de l\'upload')]
+    #[OA\Response(response: 401, description: 'Non authentifié')]
+    #[OA\Response(response: 403, description: 'Accès interdit')]
+    #[OA\Response(response: 404, description: 'Club non trouvé')]
+    public function uploadLogo(Club $club, Request $request): JsonResponse
+    {
+        $this->denyAccessUnlessGranted(ClubVoter::EDIT, $club);
+
+        $logoFile = $request->files->get('logo');
+
+        if (!$logoFile) {
+            return new JsonResponse(['error' => 'Aucun fichier logo fourni'], Response::HTTP_BAD_REQUEST);
         }
 
-        $errors = $this->validator->validate($club);
-        if (count($errors) > 0) {
-            $errorMessages = [];
-            foreach ($errors as $error) {
-                $errorMessages[] = $error->getMessage();
-            }
-            return new JsonResponse(['errors' => $errorMessages], Response::HTTP_BAD_REQUEST);
+        try {
+            $data = [];
+            $updatedClub = $this->clubService->updateClub($club, $data, $logoFile);
+
+            return new JsonResponse([
+                'imagePath' => $this->imageService->getImageUrl($updatedClub->getImagePath()),
+                'message' => 'Logo uploadé avec succès'
+            ]);
+
+        } catch (\InvalidArgumentException $e) {
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
-
-        $this->entityManager->flush();
-
-        return new JsonResponse([
-            'id' => $club->getId(),
-            'name' => $club->getName(),
-            'description' => $club->getDescription(),
-            'isPublic' => $club->isPublic(),
-            'allowJoinRequests' => $club->isAllowJoinRequests(),
-            'updatedAt' => $club->getUpdatedAt()->format('c')
-        ]);
     }
 
     #[Route('/{id}', name: 'api_clubs_delete', methods: ['DELETE'])]
@@ -344,8 +441,7 @@ class ClubController extends AbstractController
     {
         $this->denyAccessUnlessGranted(ClubVoter::DELETE, $club);
 
-        $club->setIsActive(false);
-        $this->entityManager->flush();
+        $this->clubService->deleteClub($club);
 
         return new JsonResponse(['message' => 'Club supprimé avec succès']);
     }

@@ -18,6 +18,10 @@ use Symfony\Component\Validator\Constraints as Assert;
 use Vich\UploaderBundle\Mapping\Annotation as Vich;
 
 #[ORM\Entity(repositoryClass: DocumentRepository::class)]
+#[ORM\Table(name: 'documents')]
+#[ORM\Index(columns: ['document_type'], name: 'idx_document_type')]
+#[ORM\Index(columns: ['is_confidential'], name: 'idx_confidential')]
+#[ORM\Index(columns: ['uploaded_at'], name: 'idx_uploaded_at')]
 #[ORM\HasLifecycleCallbacks]
 #[Vich\Uploadable]
 #[ApiResource(
@@ -64,6 +68,80 @@ class Document
     #[Groups(['document:read'])]
     private ?int $id = null;
 
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: false)]
+    #[Assert\NotNull(message: 'L\'utilisateur est obligatoire')]
+    #[Groups(['document:read', 'document:details'])]
+    private User $uploadedBy;
+
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: true)]
+    #[Groups(['document:read', 'document:details'])]
+    private ?User $relatedUser = null;
+
+    #[ORM\Column(type: 'text')]
+    #[Groups(['document:read', 'document:details'])]
+    private string $originalName; // Chiffré pour confidentialité
+
+    #[ORM\Column(type: 'string', length: 500)]
+    #[Groups(['document:read', 'document:details'])]
+    private string $securePath; // Chemin dans le stockage sécurisé
+
+    #[ORM\Column(type: 'string', length: 100)]
+    #[Groups(['document:read', 'document:details'])]
+    private string $mimeType;
+
+    #[ORM\Column(type: 'integer')]
+    #[Groups(['document:read', 'document:details'])]
+    private int $fileSize;
+
+    #[ORM\Column(type: 'string', length: 100)]
+    #[Assert\NotBlank]
+    #[Assert\Choice(choices: [
+        'passport', 'identity_card', 'license', 'certificate', 
+        'medical_document', 'insurance', 'contract', 'invoice',
+        'photo', 'other'
+    ])]
+    #[Groups(['document:read', 'document:details'])]
+    private string $documentType;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    #[Groups(['document:read', 'document:details'])]
+    private ?string $description = null;
+
+    #[ORM\Column(type: 'boolean')]
+    #[Groups(['document:read', 'document:details'])]
+    private bool $isConfidential = true; // Par défaut, tous les documents sont confidentiels
+
+    #[ORM\Column(type: 'datetime')]
+    #[Groups(['document:read', 'document:details'])]
+    private \DateTime $uploadedAt;
+
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    #[Groups(['document:read', 'document:details'])]
+    private ?\DateTime $lastAccessedAt = null;
+
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    #[Groups(['document:read', 'document:details'])]
+    private int $accessCount = 0;
+
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    #[Groups(['document:read', 'document:details'])]
+    private ?string $accessToken = null; // Token temporaire pour accès sécurisé
+
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    #[Groups(['document:read', 'document:details'])]
+    private ?\DateTime $accessTokenExpiry = null;
+
+    // Métadonnées de sécurité
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['document:read', 'document:details'])]
+    private ?array $securityMetadata = null;
+
+    #[ORM\Column(type: 'boolean', options: ['default' => true])]
+    #[Groups(['document:read', 'document:details'])]
+    private bool $isActive = true;
+
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank(message: 'Le nom du document est obligatoire')]
     #[Assert\Length(
@@ -75,10 +153,6 @@ class Document
     #[Groups(['document:read', 'document:create', 'document:update'])]
     private ?string $name = null;
 
-    #[ORM\Column(type: Types::TEXT, nullable: true)]
-    #[Groups(['document:read', 'document:details', 'document:create', 'document:update'])]
-    private ?string $description = null;
-
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['document:read'])]
     private ?string $filePath = null;
@@ -86,24 +160,6 @@ class Document
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['document:read'])]
     private ?string $originalFileName = null;
-
-    #[ORM\Column(length: 100, nullable: true)]
-    #[Groups(['document:read'])]
-    private ?string $mimeType = null;
-
-    #[ORM\Column(nullable: true)]
-    #[Groups(['document:read'])]
-    private ?int $fileSize = null;
-
-    #[Vich\UploadableField(mapping: 'documents', fileNameProperty: 'filePath', originalName: 'originalFileName', mimeType: 'mimeType', size: 'fileSize')]
-    #[Assert\File(
-        maxSize: self::MAX_FILE_SIZE,
-        mimeTypes: self::ALLOWED_MIME_TYPES,
-        maxSizeMessage: 'Le fichier ne peut pas dépasser {{ limit }}',
-        mimeTypesMessage: 'Le type de fichier "{{ type }}" n\'est pas autorisé. Les types autorisés sont : {{ types }}'
-    )]
-    #[Groups(['document:create', 'document:update'])]
-    private ?File $documentFile = null;
 
     #[ORM\Column(length: 50, enumType: DocumentStatus::class)]
     #[Groups(['document:read', 'document:update'])]
@@ -121,9 +177,12 @@ class Document
     #[Groups(['document:read', 'document:details', 'document:update'])]
     private ?string $rejectionReason = null;
 
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Groups(['document:read', 'document:details', 'document:update'])]
+    private ?string $validationNotes = null;
+
     #[ORM\ManyToOne(inversedBy: 'documents')]
     #[ORM\JoinColumn(nullable: false)]
-    #[Assert\NotNull(message: 'L\'utilisateur est obligatoire')]
     #[Groups(['document:read', 'document:details'])]
     private ?User $user = null;
 
@@ -131,7 +190,7 @@ class Document
     #[ORM\JoinColumn(nullable: false)]
     #[Assert\NotNull(message: 'Le type de document est obligatoire')]
     #[Groups(['document:read', 'document:details'])]
-    private ?DocumentType $documentType = null;
+    private ?DocumentType $documentTypeEntity = null;
 
     #[ORM\ManyToOne]
     #[Groups(['document:read', 'document:details'])]
@@ -168,14 +227,80 @@ class Document
         return $this->id;
     }
 
-    public function getName(): ?string
+    public function getUploadedBy(): User
     {
-        return $this->name;
+        return $this->uploadedBy;
     }
 
-    public function setName(string $name): static
+    public function setUploadedBy(User $uploadedBy): self
     {
-        $this->name = $name;
+        $this->uploadedBy = $uploadedBy;
+        return $this;
+    }
+
+    public function getRelatedUser(): ?User
+    {
+        return $this->relatedUser;
+    }
+
+    public function setRelatedUser(?User $relatedUser): self
+    {
+        $this->relatedUser = $relatedUser;
+        return $this;
+    }
+
+    public function getOriginalName(): string
+    {
+        return $this->originalName;
+    }
+
+    public function setOriginalName(string $originalName): self
+    {
+        $this->originalName = $originalName;
+        return $this;
+    }
+
+    public function getSecurePath(): string
+    {
+        return $this->securePath;
+    }
+
+    public function setSecurePath(string $securePath): self
+    {
+        $this->securePath = $securePath;
+        return $this;
+    }
+
+    public function getMimeType(): string
+    {
+        return $this->mimeType;
+    }
+
+    public function setMimeType(string $mimeType): self
+    {
+        $this->mimeType = $mimeType;
+        return $this;
+    }
+
+    public function getFileSize(): int
+    {
+        return $this->fileSize;
+    }
+
+    public function setFileSize(int $fileSize): self
+    {
+        $this->fileSize = $fileSize;
+        return $this;
+    }
+
+    public function getDocumentType(): string
+    {
+        return $this->documentType;
+    }
+
+    public function setDocumentType(string $documentType): self
+    {
+        $this->documentType = $documentType;
         return $this;
     }
 
@@ -184,9 +309,176 @@ class Document
         return $this->description;
     }
 
-    public function setDescription(?string $description): static
+    public function setDescription(?string $description): self
     {
         $this->description = $description;
+        return $this;
+    }
+
+    public function isConfidential(): bool
+    {
+        return $this->isConfidential;
+    }
+
+    public function setIsConfidential(bool $isConfidential): self
+    {
+        $this->isConfidential = $isConfidential;
+        return $this;
+    }
+
+    public function getUploadedAt(): \DateTime
+    {
+        return $this->uploadedAt;
+    }
+
+    public function setUploadedAt(\DateTime $uploadedAt): self
+    {
+        $this->uploadedAt = $uploadedAt;
+        return $this;
+    }
+
+    public function getLastAccessedAt(): ?\DateTime
+    {
+        return $this->lastAccessedAt;
+    }
+
+    public function setLastAccessedAt(?\DateTime $lastAccessedAt): self
+    {
+        $this->lastAccessedAt = $lastAccessedAt;
+        return $this;
+    }
+
+    public function getAccessCount(): int
+    {
+        return $this->accessCount;
+    }
+
+    public function incrementAccessCount(): self
+    {
+        $this->accessCount++;
+        $this->lastAccessedAt = new \DateTime();
+        return $this;
+    }
+
+    public function getAccessToken(): ?string
+    {
+        return $this->accessToken;
+    }
+
+    public function setAccessToken(?string $accessToken): self
+    {
+        $this->accessToken = $accessToken;
+        return $this;
+    }
+
+    public function getAccessTokenExpiry(): ?\DateTime
+    {
+        return $this->accessTokenExpiry;
+    }
+
+    public function setAccessTokenExpiry(?\DateTime $accessTokenExpiry): self
+    {
+        $this->accessTokenExpiry = $accessTokenExpiry;
+        return $this;
+    }
+
+    public function getSecurityMetadata(): ?array
+    {
+        return $this->securityMetadata;
+    }
+
+    public function setSecurityMetadata(?array $securityMetadata): self
+    {
+        $this->securityMetadata = $securityMetadata;
+        return $this;
+    }
+
+    public function addSecurityMetadata(string $key, mixed $value): self
+    {
+        if ($this->securityMetadata === null) {
+            $this->securityMetadata = [];
+        }
+        
+        $this->securityMetadata[$key] = $value;
+        return $this;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->isActive;
+    }
+
+    public function setIsActive(bool $isActive): self
+    {
+        $this->isActive = $isActive;
+        return $this;
+    }
+
+    /**
+     * Vérifie si le token d'accès est valide
+     */
+    public function isAccessTokenValid(string $token): bool
+    {
+        if ($this->accessToken === null || $this->accessTokenExpiry === null) {
+            return false;
+        }
+
+        if ($this->accessTokenExpiry < new \DateTime()) {
+            return false;
+        }
+
+        return hash_equals($this->accessToken, $token);
+    }
+
+    /**
+     * Génère un token d'accès temporaire sécurisé
+     */
+    public function generateSecureAccessToken(int $validityMinutes = 30): string
+    {
+        $token = bin2hex(random_bytes(32));
+        $this->accessToken = hash('sha256', $token);
+        $this->accessTokenExpiry = (new \DateTime())->add(new \DateInterval("PT{$validityMinutes}M"));
+        
+        return $token; // Retourner le token non hashé pour l'utilisateur
+    }
+
+    /**
+     * Invalide le token d'accès
+     */
+    public function invalidateAccessToken(): self
+    {
+        $this->accessToken = null;
+        $this->accessTokenExpiry = null;
+        return $this;
+    }
+
+    /**
+     * Retourne une version publique sécurisée de l'entité
+     */
+    public function toSecureArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'documentType' => $this->documentType,
+            'description' => $this->description,
+            'fileSize' => $this->fileSize,
+            'mimeType' => $this->mimeType,
+            'uploadedAt' => $this->uploadedAt->format('c'),
+            'isConfidential' => $this->isConfidential,
+            'accessCount' => $this->accessCount,
+            'lastAccessedAt' => $this->lastAccessedAt?->format('c'),
+            // Ne pas exposer : originalName (chiffré), securePath, accessToken
+        ];
+    }
+
+    public function getName(): ?string
+    {
+        return $this->name;
+    }
+
+    public function setName(string $name): static
+    {
+        $this->name = $name;
         return $this;
     }
 
@@ -209,44 +501,6 @@ class Document
     public function setOriginalFileName(?string $originalFileName): static
     {
         $this->originalFileName = $originalFileName;
-        return $this;
-    }
-
-    public function getMimeType(): ?string
-    {
-        return $this->mimeType;
-    }
-
-    public function setMimeType(?string $mimeType): static
-    {
-        $this->mimeType = $mimeType;
-        return $this;
-    }
-
-    public function getFileSize(): ?int
-    {
-        return $this->fileSize;
-    }
-
-    public function setFileSize(?int $fileSize): static
-    {
-        $this->fileSize = $fileSize;
-        return $this;
-    }
-
-    public function getDocumentFile(): ?File
-    {
-        return $this->documentFile;
-    }
-
-    public function setDocumentFile(?File $documentFile = null): static
-    {
-        $this->documentFile = $documentFile;
-
-        if ($documentFile) {
-            $this->updatedAt = new \DateTime();
-        }
-
         return $this;
     }
 
@@ -294,6 +548,17 @@ class Document
         return $this;
     }
 
+    public function getValidationNotes(): ?string
+    {
+        return $this->validationNotes;
+    }
+
+    public function setValidationNotes(?string $validationNotes): static
+    {
+        $this->validationNotes = $validationNotes;
+        return $this;
+    }
+
     public function getUser(): ?User
     {
         return $this->user;
@@ -305,14 +570,14 @@ class Document
         return $this;
     }
 
-    public function getDocumentType(): ?DocumentType
+    public function getDocumentTypeEntity(): ?DocumentType
     {
-        return $this->documentType;
+        return $this->documentTypeEntity;
     }
 
-    public function setDocumentType(?DocumentType $documentType): static
+    public function setDocumentTypeEntity(?DocumentType $documentTypeEntity): static
     {
-        $this->documentType = $documentType;
+        $this->documentTypeEntity = $documentTypeEntity;
         return $this;
     }
 
@@ -363,7 +628,7 @@ class Document
 
     public function isValidated(): bool
     {
-        return $this->status === DocumentStatus::VALIDATED;
+        return $this->status === DocumentStatus::APPROVED;
     }
 
     public function isRejected(): bool
@@ -406,15 +671,15 @@ class Document
 
     public function validate(User $validatedBy): static
     {
-        $this->status = DocumentStatus::VALIDATED;
+        $this->status = DocumentStatus::APPROVED;
         $this->validatedBy = $validatedBy;
         $this->validatedAt = new \DateTime();
         $this->rejectionReason = null;
         
         // Set expiration date if document type has validity duration
-        if ($this->documentType && $this->documentType->isExpirable()) {
+        if ($this->documentTypeEntity && $this->documentTypeEntity->isExpirable()) {
             $this->expirationDate = new \DateTime();
-            $this->expirationDate->add(new \DateInterval("P{$this->documentType->getValidityDurationInDays()}D"));
+            $this->expirationDate->add(new \DateInterval("P{$this->documentTypeEntity->getValidityDurationInDays()}D"));
         }
         
         return $this;

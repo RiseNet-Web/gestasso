@@ -78,17 +78,163 @@ class ClubManagementTest extends ApiTestCase
 
     public function testClubCreationWithLogo(): void
     {
-        // Simuler l'upload d'un logo (dans un vrai test, on utiliserait UploadedFile)
-        $clubData = [
+        // Créer une image de test
+        $testImagePath = $this->createTestImage();
+        $uploadedFile = new \Symfony\Component\HttpFoundation\File\UploadedFile(
+            $testImagePath,
+            'logo.jpg',
+            'image/jpeg',
+            null,
+            true
+        );
+        
+        // Préparer les données avec upload de fichier
+        $formData = [
             'name' => 'Racing Club Paris',
             'description' => 'Club avec logo',
-            'logoPath' => '/uploads/logos/racing-club-logo.png'
+            'isPublic' => true,
+            'allowJoinRequests' => true
         ];
 
-        $this->authenticatedRequest('POST', '/api/clubs', $this->marcDubois, $clubData);
+        $files = [
+            'logo' => $uploadedFile
+        ];
+
+        $this->authenticatedMultipartRequest('POST', '/api/clubs', $this->marcDubois, $formData, $files);
         
         $responseData = $this->assertJsonResponse(201);
-        $this->assertArrayHasKey('logoPath', $responseData);
+        $this->assertArrayHasKey('imagePath', $responseData);
+        $this->assertNotNull($responseData['imagePath']);
+        $this->assertStringContainsString('/uploads/clubs/', $responseData['imagePath']);
+        
+        // Nettoyer
+        if (file_exists($testImagePath)) {
+            unlink($testImagePath);
+        }
+    }
+
+    public function testClubLogoUpload(): void
+    {
+        $club = $this->createTestClub($this->marcDubois);
+        
+        // Créer une image de test
+        $testImagePath = $this->createTestImage();
+        $uploadedFile = new \Symfony\Component\HttpFoundation\File\UploadedFile(
+            $testImagePath,
+            'new-logo.jpg',
+            'image/jpeg',
+            null,
+            true
+        );
+        
+        $files = [
+            'logo' => $uploadedFile
+        ];
+
+        $this->authenticatedMultipartRequest('POST', '/api/clubs/' . $club->getId() . '/logo', $this->marcDubois, [], $files);
+        
+        $responseData = $this->assertJsonResponse(200);
+        $this->assertArrayHasKey('imagePath', $responseData);
+        $this->assertArrayHasKey('message', $responseData);
+        $this->assertEquals('Logo uploadé avec succès', $responseData['message']);
+        
+        // Vérifier que le club a bien été mis à jour
+        $this->authenticatedRequest('GET', '/api/clubs/' . $club->getId(), $this->marcDubois);
+        $clubData = $this->assertJsonResponse(200);
+        $this->assertNotNull($clubData['imagePath']);
+        $this->assertStringContainsString('/uploads/clubs/', $clubData['imagePath']);
+        
+        // Nettoyer
+        if (file_exists($testImagePath)) {
+            unlink($testImagePath);
+        }
+    }
+
+    public function testClubLogoUploadInvalidFile(): void
+    {
+        $club = $this->createTestClub($this->marcDubois);
+        
+        // Créer un fichier texte au lieu d'une image
+        $testTextFile = tempnam(sys_get_temp_dir(), 'test_text') . '.txt';
+        file_put_contents($testTextFile, 'This is not an image');
+        
+        $uploadedFile = new \Symfony\Component\HttpFoundation\File\UploadedFile(
+            $testTextFile,
+            'not-an-image.txt',
+            'text/plain',
+            null,
+            true
+        );
+        
+        $files = [
+            'logo' => $uploadedFile
+        ];
+
+        $this->authenticatedMultipartRequest('POST', '/api/clubs/' . $club->getId() . '/logo', $this->marcDubois, [], $files);
+        
+        $this->assertErrorResponse(400, 'Type de fichier non autorisé');
+        
+        // Nettoyer
+        if (file_exists($testTextFile)) {
+            unlink($testTextFile);
+        }
+    }
+
+    public function testClubLogoUploadTooLarge(): void
+    {
+        $club = $this->createTestClub($this->marcDubois);
+        
+        // Créer une image très grande
+        $testImagePath = $this->createTestImage(2500, 2100);
+        $uploadedFile = new \Symfony\Component\HttpFoundation\File\UploadedFile(
+            $testImagePath,
+            'huge-logo.jpg',
+            'image/jpeg',
+            null,
+            true
+        );
+        
+        $files = [
+            'logo' => $uploadedFile
+        ];
+
+        $this->authenticatedMultipartRequest('POST', '/api/clubs/' . $club->getId() . '/logo', $this->marcDubois, [], $files);
+        
+        $this->assertErrorResponse(400, 'image est trop grande');
+        
+        // Nettoyer
+        if (file_exists($testImagePath)) {
+            unlink($testImagePath);
+        }
+    }
+
+    public function testClubLogoUploadUnauthorized(): void
+    {
+        $club = $this->createTestClub($this->marcDubois);
+        
+        // Créer une image de test
+        $testImagePath = $this->createTestImage();
+        $uploadedFile = new \Symfony\Component\HttpFoundation\File\UploadedFile(
+            $testImagePath,
+            'logo.jpg',
+            'image/jpeg',
+            null,
+            true
+        );
+        
+        $files = [
+            'logo' => $uploadedFile
+        ];
+
+        // Sophie (co-gestionnaire) ne peut pas uploader de logo sans permission d'édition
+        $this->authenticatedMultipartRequest('POST', '/api/clubs/' . $club->getId() . '/logo', $this->sophieMartin, [], $files);
+        
+        $this->assertErrorResponse(403);
+        
+        // Nettoyer
+        if (file_exists($testImagePath)) {
+            unlink($testImagePath);
+        }
     }
 
     public function testSeasonCreation(): void
@@ -192,31 +338,7 @@ class ClubManagementTest extends ApiTestCase
         $this->assertErrorResponse(400, 'restrictions d\'âge');
     }
 
-    public function testPaymentScheduleGeneration(): void
-    {
-        $club = $this->createTestClub($this->marcDubois);
-        $season = $this->createTestSeason($club);
-        $team = $this->createTestTeam($club, $season, 'Seniors Masculins', 450.00);
 
-        // Configurer le calendrier de paiements (3 échéances)
-        $scheduleData = [
-            'team' => '/api/teams/' . $team->getId(),
-            'numberOfPayments' => 3,
-            'firstPaymentDate' => '2024-09-15',
-            'paymentInterval' => 'monthly' // ou 'quarterly', 'yearly'
-        ];
-
-        $this->authenticatedRequest('POST', '/api/payment-schedules', $this->marcDubois, $scheduleData);
-        
-        $responseData = $this->assertJsonResponse(201);
-        
-        $this->assertEquals(3, $responseData['numberOfPayments']);
-        $this->assertEquals(150.00, $responseData['amountPerPayment']); // 450€ / 3
-        
-        // Vérifier que les échéances sont générées
-        $this->assertArrayHasKey('payments', $responseData);
-        $this->assertCount(3, $responseData['payments']);
-    }
 
     public function testAddCoManager(): void
     {

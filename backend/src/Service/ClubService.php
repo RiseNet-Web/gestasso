@@ -7,16 +7,18 @@ use App\Entity\User;
 use App\Entity\ClubManager;
 use App\Entity\Season;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class ClubService
 {
     public function __construct(
         private EntityManagerInterface $entityManager,
-        private ValidatorInterface $validator
+        private ValidatorInterface $validator,
+        private ImageService $imageService
     ) {}
 
-    public function createClub(User $owner, array $data): Club
+    public function createClub(User $owner, array $data, ?UploadedFile $logoFile = null): Club
     {
         $club = new Club();
         $club->setOwner($owner);
@@ -25,9 +27,22 @@ class ClubService
         $club->setIsPublic($data['isPublic'] ?? true);
         $club->setAllowJoinRequests($data['allowJoinRequests'] ?? true);
         $club->setIsActive(true);
-        if (isset($data['imagePath'])) {
+        
+        // Gérer l'upload de logo
+        if ($logoFile !== null) {
+            try {
+                $logoPath = $this->imageService->uploadClubLogo($logoFile);
+                $club->setImagePath($logoPath);
+                
+                // Redimensionner l'image si nécessaire
+                $this->imageService->resizeImageIfNeeded($logoPath, 400, 400);
+            } catch (\InvalidArgumentException $e) {
+                throw new \InvalidArgumentException('Erreur lors de l\'upload du logo : ' . $e->getMessage());
+            }
+        } elseif (isset($data['imagePath'])) {
             $club->setImagePath($data['imagePath']);
         }
+        
         $errors = $this->validator->validate($club);
         if (count($errors) > 0) {
             $errorMessages = [];
@@ -41,7 +56,7 @@ class ClubService
         return $club;
     }
 
-    public function updateClub(Club $club, array $data): Club
+    public function updateClub(Club $club, array $data, ?UploadedFile $logoFile = null): Club
     {
         if (isset($data['name'])) {
             $club->setName($data['name']);
@@ -55,9 +70,28 @@ class ClubService
         if (isset($data['allowJoinRequests'])) {
             $club->setAllowJoinRequests($data['allowJoinRequests']);
         }
-        if (isset($data['imagePath'])) {
+        
+        // Gérer l'upload de nouveau logo
+        if ($logoFile !== null) {
+            try {
+                // Supprimer l'ancien logo s'il existe
+                if ($club->getImagePath()) {
+                    $this->imageService->deleteClubImage($club->getImagePath());
+                }
+                
+                // Uploader le nouveau logo
+                $logoPath = $this->imageService->uploadClubLogo($logoFile);
+                $club->setImagePath($logoPath);
+                
+                // Redimensionner l'image si nécessaire
+                $this->imageService->resizeImageIfNeeded($logoPath, 400, 400);
+            } catch (\InvalidArgumentException $e) {
+                throw new \InvalidArgumentException('Erreur lors de l\'upload du logo : ' . $e->getMessage());
+            }
+        } elseif (isset($data['imagePath'])) {
             $club->setImagePath($data['imagePath']);
         }
+        
         $errors = $this->validator->validate($club);
         if (count($errors) > 0) {
             $errorMessages = [];
@@ -72,6 +106,11 @@ class ClubService
 
     public function deleteClub(Club $club): void
     {
+        // Supprimer le logo du club s'il existe
+        if ($club->getImagePath()) {
+            $this->imageService->deleteClubImage($club->getImagePath());
+        }
+        
         $club->setIsActive(false);
         $this->entityManager->flush();
     }

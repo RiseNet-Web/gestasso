@@ -1,0 +1,12 @@
+framework:
+    test: true
+    session:
+        storage_factory_id: session.storage.factory.mock_file
+    # Ignorer la dépréciation spécifique à AdvancedNameConverterInterface
+    # qui vient d'ApiPlatform et n'est pas de notre responsabilité
+    property_info:
+        enabled: true
+    serializer:
+        enabled: true
+        # Configuration pour réduire les avertissements de dépréciation
+        name_converter: null 

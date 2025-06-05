@@ -52,13 +52,13 @@ class Team
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['team:read', 'club:details', 'season:details', 'user:details', 'payment:read', 'event:read', 'cagnotte:read'])]
+    #[Groups(['team:read', 'club:details', 'season:details', 'user:details'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank(message: 'Le nom de l\'équipe est obligatoire.')]
     #[Assert\Length(max: 255, maxMessage: 'Le nom ne peut pas dépasser {{ limit }} caractères.')]
-    #[Groups(['team:read', 'team:create', 'team:update', 'club:details', 'season:details', 'payment:read', 'event:read'])]
+    #[Groups(['team:read', 'team:create', 'team:update', 'club:details', 'season:details'])]
     private ?string $name = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
@@ -114,28 +114,9 @@ class Team
     #[Groups(['team:details'])]
     private Collection $teamMembers;
 
-    #[ORM\OneToMany(mappedBy: 'team', targetEntity: PaymentSchedule::class, cascade: ['persist', 'remove'])]
-    #[Groups(['team:details'])]
-    private Collection $paymentSchedules;
-
-    #[ORM\OneToMany(mappedBy: 'team', targetEntity: Payment::class)]
-    private Collection $payments;
-
-    #[ORM\OneToMany(mappedBy: 'team', targetEntity: Cagnotte::class, cascade: ['persist', 'remove'])]
-    #[Groups(['team:details'])]
-    private Collection $cagnottes;
-
-    #[ORM\OneToMany(mappedBy: 'team', targetEntity: Event::class, cascade: ['persist', 'remove'])]
-    #[Groups(['team:details'])]
-    private Collection $events;
-
     #[ORM\OneToMany(mappedBy: 'team', targetEntity: DocumentType::class, cascade: ['persist', 'remove'])]
     #[Groups(['team:details'])]
     private Collection $documentTypes;
-
-    #[ORM\OneToMany(mappedBy: 'team', targetEntity: PaymentDeduction::class, cascade: ['persist', 'remove'])]
-    #[Groups(['team:details'])]
-    private Collection $paymentDeductions;
 
     #[ORM\OneToMany(mappedBy: 'team', targetEntity: JoinRequest::class)]
     private Collection $joinRequests;
@@ -143,12 +124,7 @@ class Team
     public function __construct()
     {
         $this->teamMembers = new ArrayCollection();
-        $this->paymentSchedules = new ArrayCollection();
-        $this->payments = new ArrayCollection();
-        $this->cagnottes = new ArrayCollection();
-        $this->events = new ArrayCollection();
         $this->documentTypes = new ArrayCollection();
-        $this->paymentDeductions = new ArrayCollection();
         $this->joinRequests = new ArrayCollection();
     }
 
@@ -334,114 +310,6 @@ class Team
     }
 
     /**
-     * @return Collection<int, PaymentSchedule>
-     */
-    public function getPaymentSchedules(): Collection
-    {
-        return $this->paymentSchedules;
-    }
-
-    public function addPaymentSchedule(PaymentSchedule $paymentSchedule): static
-    {
-        if (!$this->paymentSchedules->contains($paymentSchedule)) {
-            $this->paymentSchedules->add($paymentSchedule);
-            $paymentSchedule->setTeam($this);
-        }
-        return $this;
-    }
-
-    public function removePaymentSchedule(PaymentSchedule $paymentSchedule): static
-    {
-        if ($this->paymentSchedules->removeElement($paymentSchedule)) {
-            if ($paymentSchedule->getTeam() === $this) {
-                $paymentSchedule->setTeam(null);
-            }
-        }
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, Payment>
-     */
-    public function getPayments(): Collection
-    {
-        return $this->payments;
-    }
-
-    public function addPayment(Payment $payment): static
-    {
-        if (!$this->payments->contains($payment)) {
-            $this->payments->add($payment);
-            $payment->setTeam($this);
-        }
-        return $this;
-    }
-
-    public function removePayment(Payment $payment): static
-    {
-        if ($this->payments->removeElement($payment)) {
-            if ($payment->getTeam() === $this) {
-                $payment->setTeam(null);
-            }
-        }
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, Cagnotte>
-     */
-    public function getCagnottes(): Collection
-    {
-        return $this->cagnottes;
-    }
-
-    public function addCagnotte(Cagnotte $cagnotte): static
-    {
-        if (!$this->cagnottes->contains($cagnotte)) {
-            $this->cagnottes->add($cagnotte);
-            $cagnotte->setTeam($this);
-        }
-        return $this;
-    }
-
-    public function removeCagnotte(Cagnotte $cagnotte): static
-    {
-        if ($this->cagnottes->removeElement($cagnotte)) {
-            if ($cagnotte->getTeam() === $this) {
-                $cagnotte->setTeam(null);
-            }
-        }
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, Event>
-     */
-    public function getEvents(): Collection
-    {
-        return $this->events;
-    }
-
-    public function addEvent(Event $event): static
-    {
-        if (!$this->events->contains($event)) {
-            $this->events->add($event);
-            $event->setTeam($this);
-        }
-        return $this;
-    }
-
-    public function removeEvent(Event $event): static
-    {
-        if ($this->events->removeElement($event)) {
-            if ($event->getTeam() === $this) {
-                $event->setTeam(null);
-            }
-        }
-        return $this;
-    }
-
-    /**
      * @return Collection<int, DocumentType>
      */
     public function getDocumentTypes(): Collection
@@ -463,33 +331,6 @@ class Team
         if ($this->documentTypes->removeElement($documentType)) {
             if ($documentType->getTeam() === $this) {
                 $documentType->setTeam(null);
-            }
-        }
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, PaymentDeduction>
-     */
-    public function getPaymentDeductions(): Collection
-    {
-        return $this->paymentDeductions;
-    }
-
-    public function addPaymentDeduction(PaymentDeduction $paymentDeduction): static
-    {
-        if (!$this->paymentDeductions->contains($paymentDeduction)) {
-            $this->paymentDeductions->add($paymentDeduction);
-            $paymentDeduction->setTeam($this);
-        }
-        return $this;
-    }
-
-    public function removePaymentDeduction(PaymentDeduction $paymentDeduction): static
-    {
-        if ($this->paymentDeductions->removeElement($paymentDeduction)) {
-            if ($paymentDeduction->getTeam() === $this) {
-                $paymentDeduction->setTeam(null);
             }
         }
         return $this;
@@ -571,25 +412,7 @@ class Team
         return $this->getAthletes()->count();
     }
 
-    /**
-     * Retourne les déductions actives
-     */
-    public function getActiveDeductions(): Collection
-    {
-        return $this->paymentDeductions->filter(function(PaymentDeduction $deduction) {
-            return $deduction->isActive();
-        });
-    }
 
-    /**
-     * Retourne les événements actifs
-     */
-    public function getActiveEvents(): Collection
-    {
-        return $this->events->filter(function(Event $event) {
-            return $event->getStatus() === 'active';
-        });
-    }
 
     /**
      * Retourne les types de documents requis

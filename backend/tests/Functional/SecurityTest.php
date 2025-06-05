@@ -137,29 +137,7 @@ class SecurityTest extends ApiTestCase
         $this->assertErrorResponse(403);
     }
 
-    public function testCoachCanViewOwnTeamFinances(): void
-    {
-        // Julie peut consulter le tableau de bord financier de son équipe
-        $this->authenticatedRequest('GET', '/api/teams/' . $this->teamU18Filles->getId() . '/finances', $this->julieMoreau);
-        $responseData = $this->assertJsonResponse(200);
-        
-        $this->assertArrayHasKey('totalPayments', $responseData);
-        $this->assertArrayHasKey('pendingPayments', $responseData);
-        $this->assertArrayHasKey('memberCount', $responseData);
-    }
 
-    public function testCoachCannotCreateEvent(): void
-    {
-        // Julie NE PEUT PAS créer d'événement (réservé aux gestionnaires)
-        $eventData = [
-            'name' => 'Événement créé par coach',
-            'budget' => 1000.00,
-            'team' => '/api/teams/' . $this->teamU18Filles->getId()
-        ];
-
-        $this->authenticatedRequest('POST', '/api/events', $this->julieMoreau, $eventData);
-        $this->assertErrorResponse(403, 'permission');
-    }
 
     public function testCoachCannotModifyTeamPrice(): void
     {
@@ -172,18 +150,7 @@ class SecurityTest extends ApiTestCase
         $this->assertErrorResponse(403, 'permission');
     }
 
-    public function testCoachCanSendPaymentReminders(): void
-    {
-        // Julie peut envoyer des rappels de paiement à ses athlètes
-        $reminderData = [
-            'users' => ['/api/users/' . $this->emmaLeblanc->getId()],
-            'message' => 'Rappel de paiement pour Emma',
-            'type' => 'payment_reminder'
-        ];
 
-        $this->authenticatedRequest('POST', '/api/teams/' . $this->teamU18Filles->getId() . '/notifications', $this->julieMoreau, $reminderData);
-        $this->assertJsonResponse(201);
-    }
 
     public function testAthleteCanOnlyViewOwnData(): void
     {
@@ -196,41 +163,7 @@ class SecurityTest extends ApiTestCase
         $this->assertErrorResponse(403);
     }
 
-    public function testAthleteCanViewOwnCagnotte(): void
-    {
-        // Emma peut consulter sa propre cagnotte
-        $this->authenticatedRequest('GET', '/api/users/' . $this->emmaLeblanc->getId() . '/cagnotte', $this->emmaLeblanc);
-        $responseData = $this->assertJsonResponse(200);
-        
-        $this->assertArrayHasKey('balance', $responseData);
-        $this->assertEquals($this->emmaLeblanc->getId(), $responseData['user']['id']);
-    }
 
-    public function testAthleteCannotViewOtherCagnotte(): void
-    {
-        // Emma NE PEUT PAS consulter la cagnotte de Lucas
-        $this->authenticatedRequest('GET', '/api/users/' . $this->lucasAthlète->getId() . '/cagnotte', $this->emmaLeblanc);
-        $this->assertErrorResponse(403);
-    }
-
-    public function testAthleteCannotModifyPaymentAmounts(): void
-    {
-        // Emma NE PEUT PAS modifier les montants de ses paiements
-        $paymentData = [
-            'amount' => 1.00 // Tentative de réduction
-        ];
-
-        // Obtenir un paiement d'Emma
-        $this->authenticatedRequest('GET', '/api/users/' . $this->emmaLeblanc->getId() . '/payments', $this->emmaLeblanc);
-        $paymentsData = $this->assertJsonResponse(200);
-        
-        if (!empty($paymentsData['hydra:member'])) {
-            $paymentId = $paymentsData['hydra:member'][0]['id'];
-            
-            $this->authenticatedRequest('PATCH', '/api/payments/' . $paymentId, $this->emmaLeblanc, $paymentData);
-            $this->assertErrorResponse(403);
-        }
-    }
 
     public function testOwnerCanAccessAllClubData(): void
     {

@@ -120,6 +120,40 @@ abstract class ApiTestCase extends WebTestCase
     }
 
     /**
+     * Effectue une requête multipart authentifiée (pour upload de fichiers)
+     */
+    protected function authenticatedMultipartRequest(string $method, string $uri, User $user, array $formData = [], array $files = []): void
+    {
+        $token = $this->authenticateUser($user);
+        
+        $headers = ['HTTP_AUTHORIZATION' => 'Bearer ' . $token];
+        
+        $this->client->request(
+            $method,
+            $uri,
+            $formData,
+            $files,
+            $headers
+        );
+    }
+
+    /**
+     * Crée une image de test pour les uploads
+     */
+    protected function createTestImage(int $width = 200, int $height = 150): string
+    {
+        $tempFile = tempnam(sys_get_temp_dir(), 'test_image') . '.jpg';
+        
+        $image = imagecreatetruecolor($width, $height);
+        $color = imagecolorallocate($image, 255, 0, 0); // Rouge
+        imagefill($image, 0, 0, $color);
+        imagejpeg($image, $tempFile);
+        imagedestroy($image);
+        
+        return $tempFile;
+    }
+
+    /**
      * Assertions communes pour les réponses JSON
      */
     protected function assertJsonResponse(int $expectedStatusCode, ?string $expectedContentType = 'application/json'): array

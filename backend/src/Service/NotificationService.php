@@ -81,13 +81,10 @@ class NotificationService
     {
         // Types de notifications qui doivent être envoyées par email
         $emailTypes = [
-            'payment_reminder',
-            'payment_overdue',
             'document_validation',
             'join_request_approved',
             'join_request_rejected',
-            'event_created',
-            'cagnotte_credited'
+            'manager_invitation'
         ];
 
         return in_array($type, $emailTypes);
@@ -150,36 +147,7 @@ class NotificationService
         ]);
     }
 
-    /**
-     * Envoie des rappels de paiement en masse
-     */
-    public function sendPaymentReminders(array $payments): int
-    {
-        $count = 0;
-        
-        foreach ($payments as $payment) {
-            $this->createNotification(
-                $payment->getUser(),
-                'payment_reminder',
-                'Rappel de paiement',
-                sprintf(
-                    'Vous avez un paiement de %s€ à effectuer avant le %s pour l\'équipe %s.',
-                    $payment->getAmount(),
-                    $payment->getDueDate()->format('d/m/Y'),
-                    $payment->getTeam()->getName()
-                ),
-                [
-                    'paymentId' => $payment->getId(),
-                    'teamId' => $payment->getTeam()->getId(),
-                    'amount' => $payment->getAmount(),
-                    'dueDate' => $payment->getDueDate()->format('Y-m-d')
-                ]
-            );
-            $count++;
-        }
 
-        return $count;
-    }
 
     /**
      * Notifie les gestionnaires d'une nouvelle demande d'adhésion
