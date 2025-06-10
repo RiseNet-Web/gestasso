@@ -245,17 +245,33 @@ class RefreshTokenTest extends ApiTestCase
         $accessToken = $this->authenticateUser($user);
         
         // Déconnexion de tous les appareils
-        $this->client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer ' . $accessToken);
-        $this->client->request('POST', '/api/logout', [], [], [], json_encode(['allDevices' => true]));
+        $this->client->request(
+            'POST', 
+            '/api/logout', 
+            [], 
+            [], 
+            [
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $accessToken,
+                'CONTENT_TYPE' => 'application/json'
+            ],
+            json_encode(['allDevices' => true])
+        );
         
         $this->assertJsonResponse(200);
         
         // Vérifier que tous les tokens sont révoqués
+        $this->entityManager->refresh($user); // Rafraîchir l'utilisateur depuis la base de données
+        
         foreach ($tokens as $tokenString) {
             $token = $this->entityManager->getRepository(RefreshToken::class)
                 ->findOneBy(['token' => $tokenString]);
             
-            $this->assertTrue($token->isRevoked());
+            $this->assertNotNull($token, "Le token $tokenString devrait exister en base de données");
+            
+            // Rafraîchir l'entité pour s'assurer qu'on a les dernières données
+            $this->entityManager->refresh($token);
+            
+            $this->assertTrue($token->isRevoked(), "Le token $tokenString devrait être révoqué");
         }
     }
 
