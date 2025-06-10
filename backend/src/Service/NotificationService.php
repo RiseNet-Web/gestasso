@@ -147,8 +147,6 @@ class NotificationService
         ]);
     }
 
-
-
     /**
      * Notifie les gestionnaires d'une nouvelle demande d'adhésion
      */
@@ -160,17 +158,20 @@ class NotificationService
         // Notifier le propriétaire du club
         $this->createNotification(
             $club->getOwner(),
-            'join_request_new',
+            'new_join_request',
             'Nouvelle demande d\'adhésion',
             sprintf(
-                '%s souhaite rejoindre l\'équipe %s',
-                $joinRequest->getUser()->getFullName(),
+                '%s %s souhaite rejoindre l\'équipe %s',
+                $joinRequest->getUser()->getFirstName(),
+                $joinRequest->getUser()->getLastName(),
                 $team->getName()
             ),
             [
                 'joinRequestId' => $joinRequest->getId(),
+                'teamId' => $team->getId(),
+                'teamName' => $team->getName(),
                 'userId' => $joinRequest->getUser()->getId(),
-                'teamId' => $team->getId()
+                'userName' => $joinRequest->getUser()->getFirstName() . ' ' . $joinRequest->getUser()->getLastName()
             ]
         );
 
@@ -179,21 +180,66 @@ class NotificationService
             if ($manager->getUser() !== $club->getOwner()) {
                 $this->createNotification(
                     $manager->getUser(),
-                    'join_request_new',
+                    'new_join_request',
                     'Nouvelle demande d\'adhésion',
                     sprintf(
-                        '%s souhaite rejoindre l\'équipe %s',
-                        $joinRequest->getUser()->getFullName(),
+                        '%s %s souhaite rejoindre l\'équipe %s',
+                        $joinRequest->getUser()->getFirstName(),
+                        $joinRequest->getUser()->getLastName(),
                         $team->getName()
                     ),
                     [
                         'joinRequestId' => $joinRequest->getId(),
+                        'teamId' => $team->getId(),
+                        'teamName' => $team->getName(),
                         'userId' => $joinRequest->getUser()->getId(),
-                        'teamId' => $team->getId()
+                        'userName' => $joinRequest->getUser()->getFirstName() . ' ' . $joinRequest->getUser()->getLastName()
                     ]
                 );
             }
         }
+    }
+
+    /**
+     * Notifie l'utilisateur que sa demande d'adhésion a été approuvée
+     */
+    public function notifyJoinRequestApproval($joinRequest, $assignedRole): void
+    {
+        $this->createNotification(
+            $joinRequest->getUser(),
+            'join_request_approved',
+            'Demande d\'adhésion approuvée',
+            sprintf(
+                "Votre demande d'adhésion à l'équipe %s a été approuvée.",
+                $joinRequest->getTeam()->getName()
+            ),
+            [
+                'teamId' => $joinRequest->getTeam()->getId(),
+                'teamName' => $joinRequest->getTeam()->getName(),
+                'assignedRole' => $assignedRole->value
+            ]
+        );
+    }
+
+    /**
+     * Notifie l'utilisateur que sa demande d'adhésion a été rejetée
+     */
+    public function notifyJoinRequestRejection($joinRequest): void
+    {
+        $this->createNotification(
+            $joinRequest->getUser(),
+            'join_request_rejected',
+            'Demande d\'adhésion refusée',
+            sprintf(
+                "Votre demande d'adhésion à l'équipe %s a été refusée.",
+                $joinRequest->getTeam()->getName()
+            ),
+            [
+                'teamId' => $joinRequest->getTeam()->getId(),
+                'teamName' => $joinRequest->getTeam()->getName(),
+                'reviewNotes' => $joinRequest->getReviewNotes()
+            ]
+        );
     }
 
     /**

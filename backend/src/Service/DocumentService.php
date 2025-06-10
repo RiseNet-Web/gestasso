@@ -111,7 +111,7 @@ class DocumentService
         ]);
 
         // Notifier les gestionnaires
-        $this->notifyDocumentUploaded($document);
+        // $this->notifyDocumentUploaded($document);
 
         return $document;
     }
@@ -192,7 +192,7 @@ class DocumentService
         ]);
 
         // Notifier l'utilisateur
-        $this->notifyDocumentValidated($document, $status);
+        // $this->notifyDocumentValidated($document, $status);
 
         return $document;
     }
@@ -375,14 +375,10 @@ class DocumentService
         $documentType->setTeam($team);
         $documentType->setName($data['name'] ?? '');
         $documentType->setDescription($data['description'] ?? '');
+        $documentType->setType($data['type'] ?? null);
         $documentType->setIsRequired($data['isRequired'] ?? false);
-        $documentType->setIsExpirable($data['isExpirable'] ?? false);
+        $documentType->setHasExpirationDate($data['isExpirable'] ?? false);
         $documentType->setValidityDurationInDays($data['validityDurationInDays'] ?? null);
-        $documentType->setCreatedAt(new \DateTime());
-
-        if (isset($data['deadline'])) {
-            $documentType->setDeadline(new \DateTime($data['deadline']));
-        }
 
         // Validation
         $errors = $this->validator->validate($documentType);

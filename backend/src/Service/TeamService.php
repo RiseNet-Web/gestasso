@@ -23,7 +23,18 @@ class TeamService
         $team->setName($data['name'] ?? '');
         $team->setDescription($data['description'] ?? null);
         $team->setClub($club);
-        $team->setAnnualPrice($data['annualPrice'] ?? 0);
+        $team->setAnnualPrice((string)($data['annualPrice'] ?? '0'));
+        
+        if (isset($data['gender'])) {
+            $team->setGender($data['gender']);
+        }
+        if (isset($data['minBirthYear'])) {
+            $team->setMinBirthYear($data['minBirthYear']);
+        }
+        if (isset($data['maxBirthYear'])) {
+            $team->setMaxBirthYear($data['maxBirthYear']);
+        }
+        
         if (isset($data['seasonId'])) {
             $season = $this->entityManager->getRepository(Season::class)->find($data['seasonId']);
             if (!$season || $season->getClub() !== $club) {
@@ -53,7 +64,16 @@ class TeamService
             $team->setDescription($data['description']);
         }
         if (isset($data['annualPrice'])) {
-            $team->setAnnualPrice($data['annualPrice']);
+            $team->setAnnualPrice((string)$data['annualPrice']);
+        }
+        if (isset($data['gender'])) {
+            $team->setGender($data['gender']);
+        }
+        if (isset($data['minBirthYear'])) {
+            $team->setMinBirthYear($data['minBirthYear']);
+        }
+        if (isset($data['maxBirthYear'])) {
+            $team->setMaxBirthYear($data['maxBirthYear']);
         }
         if (isset($data['seasonId'])) {
             $season = $this->entityManager->getRepository(Season::class)->find($data['seasonId']);
@@ -93,6 +113,18 @@ class TeamService
                 $this->entityManager->remove($member);
             }
         }
+        $this->entityManager->flush();
+    }
+
+    public function deleteTeam(Team $team): void
+    {
+        $team->setIsActive(false);
+        $this->entityManager->flush();
+    }
+
+    public function setTeamStatus(Team $team, bool $isActive): void
+    {
+        $team->setIsActive($isActive);
         $this->entityManager->flush();
     }
 } 

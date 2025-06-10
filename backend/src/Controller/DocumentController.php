@@ -8,6 +8,10 @@ use App\Entity\Team;
 use App\Entity\User;
 use App\Entity\Club;
 use App\Repository\DocumentRepository;
+use App\Security\DocumentVoter;
+use App\Security\TeamVoter;
+use App\Security\ClubVoter;
+use App\Security\UserVoter;
 use App\Service\DocumentService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -108,20 +112,13 @@ class DocumentController extends AbstractController
     )]
     public function getDocumentInfo(int $id): JsonResponse
     {
-        $user = $this->getUser();
-        if (!$user instanceof User) {
-            throw new AccessDeniedHttpException('Utilisateur non authentifié');
-        }
-
         $document = $this->documentRepository->find($id);
         if (!$document) {
             throw new NotFoundHttpException('Document non trouvé');
         }
 
-        // Vérifier les permissions d'accès
-        if (!$this->canUserAccessDocument($document, $user)) {
-            throw new AccessDeniedHttpException('Accès refusé à ce document');
-        }
+        // Utiliser le voter pour vérifier les permissions
+        $this->denyAccessUnlessGranted(DocumentVoter::VIEW, $document);
 
         return new JsonResponse([
             'document' => $this->formatDocumentResponse($document)
@@ -148,10 +145,8 @@ class DocumentController extends AbstractController
             throw new NotFoundHttpException('Document non trouvé');
         }
 
-        // Vérifier les permissions d'accès
-        if (!$this->canUserAccessDocument($document, $user)) {
-            throw new AccessDeniedHttpException('Accès refusé à ce document');
-        }
+        // Utiliser le voter pour vérifier les permissions
+        $this->denyAccessUnlessGranted(DocumentVoter::VIEW, $document);
 
         return $this->documentService->downloadSecureDocument($document, $user);
     }
@@ -185,10 +180,8 @@ class DocumentController extends AbstractController
             throw new NotFoundHttpException('Document non trouvé');
         }
 
-        // Vérifier les permissions de validation
-        if (!$this->canUserValidateDocument($document, $user)) {
-            throw new AccessDeniedHttpException('Vous n\'avez pas les permissions pour valider ce document');
-        }
+        // Utiliser le voter pour vérifier les permissions de validation
+        $this->denyAccessUnlessGranted(DocumentVoter::VALIDATE, $document);
 
         $data = json_decode($request->getContent(), true) ?? [];
         
@@ -234,10 +227,8 @@ class DocumentController extends AbstractController
             throw new NotFoundHttpException('Document non trouvé');
         }
 
-        // Vérifier les permissions de suppression
-        if (!$this->canUserDeleteDocument($document, $user)) {
-            throw new AccessDeniedHttpException('Vous n\'avez pas les permissions pour supprimer ce document');
-        }
+        // Utiliser le voter pour vérifier les permissions de suppression
+        $this->denyAccessUnlessGranted(DocumentVoter::DELETE, $document);
 
         $this->documentService->deleteSecureDocument($document, $user);
 
@@ -256,20 +247,13 @@ class DocumentController extends AbstractController
     )]
     public function getTeamDocuments(int $teamId, Request $request): JsonResponse
     {
-        $user = $this->getUser();
-        if (!$user instanceof User) {
-            throw new AccessDeniedHttpException('Utilisateur non authentifié');
-        }
-
         $team = $this->entityManager->getRepository(Team::class)->find($teamId);
         if (!$team) {
             throw new NotFoundHttpException('Équipe non trouvée');
         }
 
-        // Vérifier les permissions de gestion de l'équipe
-        if (!$this->canUserManageTeam($team, $user)) {
-            throw new AccessDeniedHttpException('Accès refusé aux documents de cette équipe');
-        }
+        // Utiliser le voter pour vérifier les permissions de gestion des documents de l'équipe
+        $this->denyAccessUnlessGranted(TeamVoter::MANAGE_DOCUMENTS, $team);
 
         $status = $request->query->get('status');
         $userId = $request->query->get('userId');
@@ -299,20 +283,13 @@ class DocumentController extends AbstractController
     )]
     public function getClubDocuments(int $clubId, Request $request): JsonResponse
     {
-        $user = $this->getUser();
-        if (!$user instanceof User) {
-            throw new AccessDeniedHttpException('Utilisateur non authentifié');
-        }
-
         $club = $this->entityManager->getRepository(Club::class)->find($clubId);
         if (!$club) {
             throw new NotFoundHttpException('Club non trouvé');
         }
 
-        // Vérifier les permissions de gestion du club
-        if (!$this->canUserManageClub($club, $user)) {
-            throw new AccessDeniedHttpException('Accès refusé aux documents de ce club');
-        }
+        // Utiliser le voter pour vérifier les permissions de gestion du club
+        $this->denyAccessUnlessGranted(ClubVoter::MANAGE, $club);
 
         $status = $request->query->get('status');
         $teamId = $request->query->get('teamId');
@@ -340,20 +317,13 @@ class DocumentController extends AbstractController
     )]
     public function getUserDocuments(int $userId, Request $request): JsonResponse
     {
-        $currentUser = $this->getUser();
-        if (!$currentUser instanceof User) {
-            throw new AccessDeniedHttpException('Utilisateur non authentifié');
-        }
-
         $targetUser = $this->entityManager->getRepository(User::class)->find($userId);
         if (!$targetUser) {
             throw new NotFoundHttpException('Utilisateur non trouvé');
         }
 
-        // Vérifier les permissions
-        if (!$this->canUserAccessUserDocuments($targetUser, $currentUser)) {
-            throw new AccessDeniedHttpException('Accès refusé aux documents de cet utilisateur');
-        }
+        // Utiliser le voter pour vérifier les permissions d'accès aux documents de l'utilisateur
+        $this->denyAccessUnlessGranted(UserVoter::VIEW_DOCUMENTS, $targetUser);
 
         $teamId = $request->query->get('teamId');
         $status = $request->query->get('status');
@@ -381,20 +351,13 @@ class DocumentController extends AbstractController
     )]
     public function getDocumentTypes(int $teamId): JsonResponse
     {
-        $user = $this->getUser();
-        if (!$user instanceof User) {
-            throw new AccessDeniedHttpException('Utilisateur non authentifié');
-        }
-
         $team = $this->entityManager->getRepository(Team::class)->find($teamId);
         if (!$team) {
             throw new NotFoundHttpException('Équipe non trouvée');
         }
 
-        // Vérifier l'accès à l'équipe
-        if (!$this->canUserAccessTeam($team, $user)) {
-            throw new AccessDeniedHttpException('Accès refusé à cette équipe');
-        }
+        // Utiliser le voter pour vérifier l'accès à l'équipe
+        $this->denyAccessUnlessGranted(TeamVoter::VIEW, $team);
 
         $documentTypes = $this->entityManager->getRepository(DocumentType::class)
             ->findBy(['team' => $team], ['name' => 'ASC']);
@@ -441,10 +404,8 @@ class DocumentController extends AbstractController
             return new JsonResponse(['error' => 'Équipe non trouvée'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Vérifier les permissions de gestion
-        if (!$this->canUserManageTeam($team, $user)) {
-            throw new AccessDeniedHttpException('Vous n\'avez pas les permissions pour gérer cette équipe');
-        }
+        // Utiliser le voter pour vérifier les permissions de gestion des documents
+        $this->denyAccessUnlessGranted(TeamVoter::MANAGE_DOCUMENTS, $team);
 
         try {
             $documentType = $this->documentService->createDocumentType($team, $data);
@@ -505,135 +466,5 @@ class DocumentController extends AbstractController
             ] : null,
             'validationNotes' => $document->getValidationNotes()
         ];
-    }
-
-    /**
-     * Vérifie si un utilisateur peut accéder à un document
-     */
-    private function canUserAccessDocument(Document $document, User $user): bool
-    {
-        // L'utilisateur propriétaire du document
-        if ($document->getUser()->getId() === $user->getId()) {
-            return true;
-        }
-
-        // Admin global
-        if (in_array('ROLE_ADMIN', $user->getRoles())) {
-            return true;
-        }
-
-        // Propriétaire ou gestionnaire du club
-        $team = $document->getDocumentTypeEntity()->getTeam();
-        $club = $team->getClub();
-
-        return $this->canUserManageClub($club, $user);
-    }
-
-    /**
-     * Vérifie si un utilisateur peut valider un document
-     */
-    private function canUserValidateDocument(Document $document, User $user): bool
-    {
-        // Admin global
-        if (in_array('ROLE_ADMIN', $user->getRoles())) {
-            return true;
-        }
-
-        // Propriétaire ou gestionnaire du club
-        $team = $document->getDocumentTypeEntity()->getTeam();
-        $club = $team->getClub();
-
-        return $this->canUserManageClub($club, $user);
-    }
-
-    /**
-     * Vérifie si un utilisateur peut supprimer un document
-     */
-    private function canUserDeleteDocument(Document $document, User $user): bool
-    {
-        // L'utilisateur propriétaire du document
-        if ($document->getUser()->getId() === $user->getId()) {
-            return true;
-        }
-
-        // Admin global
-        if (in_array('ROLE_ADMIN', $user->getRoles())) {
-            return true;
-        }
-
-        // Propriétaire du club uniquement (pas les gestionnaires pour la suppression)
-        $team = $document->getDocumentTypeEntity()->getTeam();
-        $club = $team->getClub();
-
-        return $club->getOwner()->getId() === $user->getId();
-    }
-
-    /**
-     * Vérifie si un utilisateur peut gérer un club
-     */
-    private function canUserManageClub(Club $club, User $user): bool
-    {
-        // Propriétaire du club
-        if ($club->getOwner()->getId() === $user->getId()) {
-            return true;
-        }
-
-        // Gestionnaire du club
-        foreach ($club->getClubManagers() as $manager) {
-            if ($manager->getUser()->getId() === $user->getId()) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Vérifie si un utilisateur peut gérer une équipe
-     */
-    private function canUserManageTeam(Team $team, User $user): bool
-    {
-        return $this->canUserManageClub($team->getClub(), $user);
-    }
-
-    /**
-     * Vérifie si un utilisateur peut accéder à une équipe
-     */
-    private function canUserAccessTeam(Team $team, User $user): bool
-    {
-        // Peut gérer l'équipe
-        if ($this->canUserManageTeam($team, $user)) {
-            return true;
-        }
-
-        // Membre de l'équipe
-        foreach ($team->getTeamMembers() as $member) {
-            if ($member->getUser()->getId() === $user->getId()) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Vérifie si un utilisateur peut accéder aux documents d'un autre utilisateur
-     */
-    private function canUserAccessUserDocuments(User $targetUser, User $currentUser): bool
-    {
-        // Ses propres documents
-        if ($targetUser->getId() === $currentUser->getId()) {
-            return true;
-        }
-
-        // Admin global
-        if (in_array('ROLE_ADMIN', $currentUser->getRoles())) {
-            return true;
-        }
-
-        // Gestionnaire d'un club où l'utilisateur target est membre
-        // TODO: Implémenter la logique de vérification des clubs communs
-        
-        return false;
     }
 } 

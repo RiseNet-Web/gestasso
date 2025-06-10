@@ -5,9 +5,11 @@ namespace App\Controller;
 use App\Entity\JoinRequest;
 use App\Entity\Team;
 use App\Entity\User;
-use App\Entity\TeamMember;
-use App\Entity\Notification;
+use App\Enum\JoinRequestStatus;
+use App\Enum\TeamMemberRole;
 use App\Security\TeamVoter;
+use App\Service\JoinRequestService;
+use App\Service\NotificationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -15,14 +17,14 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[Route('/api/join-requests')]
 class JoinRequestController extends AbstractController
 {
     public function __construct(
         private EntityManagerInterface $entityManager,
-        private ValidatorInterface $validator
+        private JoinRequestService $joinRequestService,
+        private NotificationService $notificationService
     ) {}
 
     #[Route('', name: 'api_join_requests_create', methods: ['POST'])]
@@ -46,80 +48,44 @@ class JoinRequestController extends AbstractController
             return new JsonResponse(['error' => 'Équipe non trouvée'], Response::HTTP_NOT_FOUND);
         }
 
-        // Vérifier que le club accepte les demandes
-        if (!$team->getClub()->isAllowJoinRequests()) {
-            return new JsonResponse(['error' => 'Ce club n\'accepte pas les demandes d\'adhésion'], Response::HTTP_FORBIDDEN);
-        }
+        // Convertir les données pour le service
+        $requestData = [
+            'message' => $data['message'] ?? null,
+            'requestedRole' => isset($data['requestedRole']) ? TeamMemberRole::from($data['requestedRole']) : TeamMemberRole::ATHLETE
+        ];
 
-        // Vérifier qu'il n'y a pas déjà une demande en cours
-        $existingRequest = $this->entityManager->getRepository(JoinRequest::class)
-            ->findOneBy([
-                'user' => $user,
-                'team' => $team,
-                'status' => 'pending'
-            ]);
+        try {
+            // Utiliser le service pour créer la demande
+            $joinRequest = $this->joinRequestService->createJoinRequest($user, $team, $requestData);
 
-        if ($existingRequest) {
-            return new JsonResponse(['error' => 'Une demande est déjà en cours pour cette équipe'], Response::HTTP_CONFLICT);
-        }
+            // Créer les notifications via le service
+            $this->notificationService->notifyJoinRequest($joinRequest);
 
-        // Vérifier que l'utilisateur n'est pas déjà membre
-        $existingMember = $this->entityManager->getRepository(TeamMember::class)
-            ->findOneBy([
-                'user' => $user,
-                'team' => $team,
-                'isActive' => true
-            ]);
-
-        if ($existingMember) {
-            return new JsonResponse(['error' => 'Vous êtes déjà membre de cette équipe'], Response::HTTP_CONFLICT);
-        }
-
-        $joinRequest = new JoinRequest();
-        $joinRequest->setUser($user)
-                   ->setTeam($team)
-                   ->setClub($team->getClub())
-                   ->setMessage($data['message'] ?? null)
-                   ->setRequestedRole($data['requestedRole'] ?? 'athlete')
-                   ->setStatus('pending');
-
-        $errors = $this->validator->validate($joinRequest);
-        if (count($errors) > 0) {
-            $errorMessages = [];
-            foreach ($errors as $error) {
-                $errorMessages[] = $error->getMessage();
+            // Marquer l'onboarding comme terminé si c'était un member
+            if ($user->getOnboardingType() === 'member' && !$user->isOnboardingCompleted()) {
+                $user->setOnboardingCompleted(true);
+                $this->entityManager->flush();
             }
-            return new JsonResponse(['errors' => $errorMessages], Response::HTTP_BAD_REQUEST);
+
+            return new JsonResponse([
+                'id' => $joinRequest->getId(),
+                'team' => [
+                    'id' => $team->getId(),
+                    'name' => $team->getName(),
+                    'club' => [
+                        'id' => $team->getClub()->getId(),
+                        'name' => $team->getClub()->getName()
+                    ]
+                ],
+                'message' => $joinRequest->getMessage(),
+                'requestedRole' => $joinRequest->getRequestedRole()->value,
+                'status' => $joinRequest->getStatus()->value,
+                'createdAt' => $joinRequest->getCreatedAt()->format('c')
+            ], Response::HTTP_CREATED);
+
+        } catch (\InvalidArgumentException $e) {
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
-
-        $this->entityManager->persist($joinRequest);
-
-        // Créer une notification pour les gestionnaires du club
-        $this->createJoinRequestNotification($joinRequest);
-
-        $this->entityManager->flush();
-
-        // Marquer l'onboarding comme terminé si c'était un member
-        if ($user->getOnboardingType() === 'member' && !$user->isOnboardingCompleted()) {
-            $user->setOnboardingCompleted(true);
-            $this->entityManager->flush();
-        }
-
-        return new JsonResponse([
-            'id' => $joinRequest->getId(),
-            'team' => [
-                'id' => $team->getId(),
-                'name' => $team->getName(),
-                'club' => [
-                    'id' => $team->getClub()->getId(),
-                    'name' => $team->getClub()->getName()
-                ]
-            ],
-            'message' => $joinRequest->getMessage(),
-            'requestedRole' => $joinRequest->getRequestedRole(),
-            'status' => $joinRequest->getStatus(),
-            'createdAt' => $joinRequest->getCreatedAt()->format('c')
-        ], Response::HTTP_CREATED);
     }
 
     #[Route('/my-requests', name: 'api_join_requests_my', methods: ['GET'])]
@@ -148,9 +114,9 @@ class JoinRequestController extends AbstractController
                     ]
                 ],
                 'message' => $request->getMessage(),
-                'requestedRole' => $request->getRequestedRole(),
-                'assignedRole' => $request->getAssignedRole(),
-                'status' => $request->getStatus(),
+                'requestedRole' => $request->getRequestedRole()?->value,
+                'assignedRole' => $request->getAssignedRole()?->value,
+                'status' => $request->getStatus()->value,
                 'reviewNotes' => $request->getReviewNotes(),
                 'reviewedAt' => $request->getReviewedAt()?->format('c'),
                 'createdAt' => $request->getCreatedAt()->format('c')
@@ -184,9 +150,9 @@ class JoinRequestController extends AbstractController
                     'email' => $request->getUser()->getEmail()
                 ],
                 'message' => $request->getMessage(),
-                'requestedRole' => $request->getRequestedRole(),
-                'assignedRole' => $request->getAssignedRole(),
-                'status' => $request->getStatus(),
+                'requestedRole' => $request->getRequestedRole()?->value,
+                'assignedRole' => $request->getAssignedRole()?->value,
+                'status' => $request->getStatus()->value,
                 'reviewNotes' => $request->getReviewNotes(),
                 'reviewedBy' => $request->getReviewedBy() ? [
                     'id' => $request->getReviewedBy()->getId(),
@@ -204,7 +170,7 @@ class JoinRequestController extends AbstractController
     #[Route('/{id}/approve', name: 'api_join_requests_approve', methods: ['POST'])]
     public function approve(JoinRequest $joinRequest, Request $request): JsonResponse
     {
-        if ($joinRequest->getStatus() !== 'pending') {
+        if ($joinRequest->getStatus() !== JoinRequestStatus::PENDING) {
             return new JsonResponse(['error' => 'Cette demande a déjà été traitée'], Response::HTTP_BAD_REQUEST);
         }
 
@@ -213,82 +179,61 @@ class JoinRequestController extends AbstractController
         $user = $this->getUser();
         $data = json_decode($request->getContent(), true);
 
-        $assignedRole = $data['assignedRole'] ?? $joinRequest->getRequestedRole();
-        if (!in_array($assignedRole, ['athlete', 'coach'])) {
+        // Valider le rôle assigné
+        $assignedRoleValue = $data['assignedRole'] ?? $joinRequest->getRequestedRole()?->value ?? 'athlete';
+        try {
+            $assignedRole = TeamMemberRole::from($assignedRoleValue);
+        } catch (\ValueError $e) {
             return new JsonResponse(['error' => 'Rôle assigné invalide'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Vérifier que l'utilisateur n'est pas déjà membre
-        $existingMember = $this->entityManager->getRepository(TeamMember::class)
-            ->findOneBy([
-                'user' => $joinRequest->getUser(),
-                'team' => $joinRequest->getTeam(),
-                'isActive' => true
+        try {
+            // Utiliser le service pour approuver la demande
+            $result = $this->joinRequestService->approveJoinRequest(
+                $joinRequest, 
+                $user, 
+                $assignedRole, 
+                $data['reviewNotes'] ?? null
+            );
+
+            $teamMember = $result['teamMember'];
+
+            // Mettre à jour les rôles de l'utilisateur
+            $requestUser = $joinRequest->getUser();
+            $currentRoles = $requestUser->getRoles();
+            
+            if ($assignedRole === TeamMemberRole::COACH && !in_array('ROLE_COACH', $currentRoles)) {
+                $currentRoles[] = 'ROLE_COACH';
+                $requestUser->setRoles($currentRoles);
+            } elseif ($assignedRole === TeamMemberRole::ATHLETE && !in_array('ROLE_ATHLETE', $currentRoles)) {
+                $currentRoles[] = 'ROLE_ATHLETE';
+                $requestUser->setRoles($currentRoles);
+            }
+
+            // Créer une notification via le service
+            $this->notificationService->notifyJoinRequestApproval($joinRequest, $assignedRole);
+
+            return new JsonResponse([
+                'id' => $joinRequest->getId(),
+                'status' => $joinRequest->getStatus()->value,
+                'assignedRole' => $joinRequest->getAssignedRole()->value,
+                'reviewedAt' => $joinRequest->getReviewedAt()->format('c'),
+                'teamMember' => [
+                    'id' => $teamMember->getId(),
+                    'role' => $teamMember->getRole()->value,
+                    'joinedAt' => $teamMember->getJoinedAt()->format('c')
+                ]
             ]);
 
-        if ($existingMember) {
-            return new JsonResponse(['error' => 'Cet utilisateur est déjà membre de l\'équipe'], Response::HTTP_CONFLICT);
+        } catch (\InvalidArgumentException $e) {
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
-
-        // Approuver la demande
-        $joinRequest->setStatus('approved')
-                   ->setAssignedRole($assignedRole)
-                   ->setReviewedBy($user)
-                   ->setReviewedAt(new \DateTime())
-                   ->setReviewNotes($data['reviewNotes'] ?? null);
-
-        // Créer le membre d'équipe
-        $teamMember = new TeamMember();
-        $teamMember->setUser($joinRequest->getUser())
-                   ->setTeam($joinRequest->getTeam())
-                   ->setRole($assignedRole);
-
-        $this->entityManager->persist($teamMember);
-
-        // Mettre à jour les rôles de l'utilisateur
-        $requestUser = $joinRequest->getUser();
-        $currentRoles = $requestUser->getRoles();
-        
-        if ($assignedRole === 'coach' && !in_array('ROLE_COACH', $currentRoles)) {
-            $currentRoles[] = 'ROLE_COACH';
-            $requestUser->setRoles($currentRoles);
-        } elseif ($assignedRole === 'athlete' && !in_array('ROLE_ATHLETE', $currentRoles)) {
-            $currentRoles[] = 'ROLE_ATHLETE';
-            $requestUser->setRoles($currentRoles);
-        }
-
-        // Créer une notification pour l'utilisateur
-        $notification = new Notification();
-        $notification->setUser($joinRequest->getUser())
-                     ->setType('join_request_approved')
-                     ->setTitle('Demande d\'adhésion approuvée')
-                     ->setMessage("Votre demande d'adhésion à l'équipe {$joinRequest->getTeam()->getName()} a été approuvée.")
-                     ->setData([
-                         'teamId' => $joinRequest->getTeam()->getId(),
-                         'teamName' => $joinRequest->getTeam()->getName(),
-                         'assignedRole' => $assignedRole
-                     ]);
-
-        $this->entityManager->persist($notification);
-        $this->entityManager->flush();
-
-        return new JsonResponse([
-            'id' => $joinRequest->getId(),
-            'status' => $joinRequest->getStatus(),
-            'assignedRole' => $joinRequest->getAssignedRole(),
-            'reviewedAt' => $joinRequest->getReviewedAt()->format('c'),
-            'teamMember' => [
-                'id' => $teamMember->getId(),
-                'role' => $teamMember->getRole(),
-                'joinedAt' => $teamMember->getJoinedAt()->format('c')
-            ]
-        ]);
     }
 
     #[Route('/{id}/reject', name: 'api_join_requests_reject', methods: ['POST'])]
     public function reject(JoinRequest $joinRequest, Request $request): JsonResponse
     {
-        if ($joinRequest->getStatus() !== 'pending') {
+        if ($joinRequest->getStatus() !== JoinRequestStatus::PENDING) {
             return new JsonResponse(['error' => 'Cette demande a déjà été traitée'], Response::HTTP_BAD_REQUEST);
         }
 
@@ -297,72 +242,43 @@ class JoinRequestController extends AbstractController
         $user = $this->getUser();
         $data = json_decode($request->getContent(), true);
 
-        $joinRequest->setStatus('rejected')
-                   ->setReviewedBy($user)
-                   ->setReviewedAt(new \DateTime())
-                   ->setReviewNotes($data['reviewNotes'] ?? null);
+        try {
+            // Utiliser le service pour rejeter la demande
+            $this->joinRequestService->rejectJoinRequest(
+                $joinRequest, 
+                $user, 
+                $data['reviewNotes'] ?? 'Aucune raison fournie'
+            );
 
-        // Créer une notification pour l'utilisateur
-        $notification = new Notification();
-        $notification->setUser($joinRequest->getUser())
-                     ->setType('join_request_rejected')
-                     ->setTitle('Demande d\'adhésion refusée')
-                     ->setMessage("Votre demande d'adhésion à l'équipe {$joinRequest->getTeam()->getName()} a été refusée.")
-                     ->setData([
-                         'teamId' => $joinRequest->getTeam()->getId(),
-                         'teamName' => $joinRequest->getTeam()->getName(),
-                         'reviewNotes' => $joinRequest->getReviewNotes()
-                     ]);
+            // Créer une notification via le service
+            $this->notificationService->notifyJoinRequestRejection($joinRequest);
 
-        $this->entityManager->persist($notification);
-        $this->entityManager->flush();
+            return new JsonResponse([
+                'id' => $joinRequest->getId(),
+                'status' => $joinRequest->getStatus()->value,
+                'reviewedAt' => $joinRequest->getReviewedAt()->format('c'),
+                'reviewNotes' => $joinRequest->getReviewNotes()
+            ]);
 
-        return new JsonResponse([
-            'id' => $joinRequest->getId(),
-            'status' => $joinRequest->getStatus(),
-            'reviewedAt' => $joinRequest->getReviewedAt()->format('c'),
-            'reviewNotes' => $joinRequest->getReviewNotes()
-        ]);
+        } catch (\InvalidArgumentException $e) {
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
     }
 
-    private function createJoinRequestNotification(JoinRequest $joinRequest): void
+    #[Route('/{id}/cancel', name: 'api_join_requests_cancel', methods: ['DELETE'])]
+    #[IsGranted('ROLE_USER')]
+    public function cancel(JoinRequest $joinRequest): JsonResponse
     {
-        // Notifier le propriétaire du club
-        $owner = $joinRequest->getClub()->getOwner();
-        $notification = new Notification();
-        $notification->setUser($owner)
-                     ->setType('new_join_request')
-                     ->setTitle('Nouvelle demande d\'adhésion')
-                     ->setMessage("{$joinRequest->getUser()->getFirstName()} {$joinRequest->getUser()->getLastName()} souhaite rejoindre l'équipe {$joinRequest->getTeam()->getName()}")
-                     ->setData([
-                         'joinRequestId' => $joinRequest->getId(),
-                         'teamId' => $joinRequest->getTeam()->getId(),
-                         'teamName' => $joinRequest->getTeam()->getName(),
-                         'userId' => $joinRequest->getUser()->getId(),
-                         'userName' => $joinRequest->getUser()->getFirstName() . ' ' . $joinRequest->getUser()->getLastName()
-                     ]);
+        $user = $this->getUser();
 
-        $this->entityManager->persist($notification);
+        try {
+            // Utiliser le service pour annuler la demande
+            $this->joinRequestService->cancelJoinRequest($joinRequest, $user);
 
-        // Notifier les gestionnaires du club
-        $managers = $this->entityManager->getRepository('App\Entity\ClubManager')
-            ->findBy(['club' => $joinRequest->getClub()]);
+            return new JsonResponse(['message' => 'Demande annulée avec succès']);
 
-        foreach ($managers as $manager) {
-            $managerNotification = new Notification();
-            $managerNotification->setUser($manager->getUser())
-                               ->setType('new_join_request')
-                               ->setTitle('Nouvelle demande d\'adhésion')
-                               ->setMessage("{$joinRequest->getUser()->getFirstName()} {$joinRequest->getUser()->getLastName()} souhaite rejoindre l'équipe {$joinRequest->getTeam()->getName()}")
-                               ->setData([
-                                   'joinRequestId' => $joinRequest->getId(),
-                                   'teamId' => $joinRequest->getTeam()->getId(),
-                                   'teamName' => $joinRequest->getTeam()->getName(),
-                                   'userId' => $joinRequest->getUser()->getId(),
-                                   'userName' => $joinRequest->getUser()->getFirstName() . ' ' . $joinRequest->getUser()->getLastName()
-                               ]);
-
-            $this->entityManager->persist($managerNotification);
+        } catch (\InvalidArgumentException $e) {
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
     }
 } 
