@@ -171,7 +171,7 @@ class AuthenticationTest extends ApiTestCase
         $userAuth = new UserAuthentication();
         $userAuth->setUser($user)
                  ->setProvider(AuthProvider::EMAIL)
-                 ->setEmail('login@test.com')
+                 ->setEmail($user->getEmail())
                  ->setPassword(password_hash('password123', PASSWORD_DEFAULT));
         
         $this->entityManager->persist($userAuth);
@@ -179,7 +179,7 @@ class AuthenticationTest extends ApiTestCase
 
         // Données de connexion
         $loginData = [
-            'email' => 'login@test.com',
+            'email' => $user->getEmail(),
             'password' => 'password123'
         ];
 
@@ -402,10 +402,11 @@ class AuthenticationTest extends ApiTestCase
             'dateOfBirth' => '1990-01-01'
         ]);
 
-        // Créer un refresh token expiré
+        // Créer un refresh token expiré avec un token unique
+        $uniqueToken = 'expired_token_' . time() . '_' . mt_rand(1000, 9999);
         $expiredToken = new RefreshToken();
         $expiredToken->setUser($user)
-                    ->setToken('expired_token_123456')
+                    ->setToken($uniqueToken)
                     ->setExpiresAt(new \DateTime('-1 day'))
                     ->setIsRevoked(false);
 
@@ -414,7 +415,7 @@ class AuthenticationTest extends ApiTestCase
 
         // Essayer d'utiliser le token expiré
         $this->unauthenticatedRequest('POST', '/api/refresh-token', [
-            'refreshToken' => 'expired_token_123456'
+            'refreshToken' => $uniqueToken
         ]);
         
         $responseData = $this->assertJsonResponse(401);
@@ -621,8 +622,9 @@ class AuthenticationTest extends ApiTestCase
     public function testRegistrationWithOwnerType(): void
     {
         // Test d'inscription avec le type "owner"
+        $uniqueEmail = 'owner.' . time() . '.' . mt_rand(1000, 9999) . '@test.com';
         $userData = [
-            'email' => 'owner@test.com',
+            'email' => $uniqueEmail,
             'password' => 'password123',
             'firstName' => 'Club',
             'lastName' => 'Owner',
@@ -646,8 +648,9 @@ class AuthenticationTest extends ApiTestCase
     public function testRegistrationWithMemberType(): void
     {
         // Test d'inscription avec le type "member"
+        $uniqueEmail = 'member.' . time() . '.' . mt_rand(1000, 9999) . '@test.com';
         $userData = [
-            'email' => 'member@test.com',
+            'email' => $uniqueEmail,
             'password' => 'password123',
             'firstName' => 'Simple',
             'lastName' => 'Member',
@@ -671,8 +674,9 @@ class AuthenticationTest extends ApiTestCase
     public function testRegistrationWithValidAges(): void
     {
         // Test avec un utilisateur mineur
+        $uniqueEmail1 = 'minor.' . time() . '.' . mt_rand(1000, 9999) . '@test.com';
         $minorData = [
-            'email' => 'minor@test.com',
+            'email' => $uniqueEmail1,
             'password' => 'password123',
             'firstName' => 'Jeune',
             'lastName' => 'Athlete',
@@ -686,8 +690,9 @@ class AuthenticationTest extends ApiTestCase
         $this->assertArrayHasKey('refreshToken', $responseData);
 
         // Test avec un utilisateur majeur
+        $uniqueEmail2 = 'adult.' . time() . '.' . mt_rand(1000, 9999) . '@test.com';
         $adultData = [
-            'email' => 'adult@test.com',
+            'email' => $uniqueEmail2,
             'password' => 'password123',
             'firstName' => 'Adulte',
             'lastName' => 'Athlete',

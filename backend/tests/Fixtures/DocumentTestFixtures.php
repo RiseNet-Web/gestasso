@@ -185,8 +185,8 @@ class DocumentTestFixtures
         $u18Team->setName('U18 Filles');
         $u18Team->setDescription('Équipe féminine des moins de 18 ans');
         $u18Team->setClub($club);
-        $u18Team->setMinAge(16);
-        $u18Team->setMaxAge(18);
+        $u18Team->setMinBirthYear(2007); // 2025 - 18 = âge max 18 ans
+        $u18Team->setMaxBirthYear(2009); // 2025 - 16 = âge min 16 ans
         $u18Team->setGender('F');
         $u18Team->setIsActive(true);
 
@@ -217,7 +217,7 @@ class DocumentTestFixtures
         $teamMember = new TeamMember();
         $teamMember->setUser($emma);
         $teamMember->setTeam($team);
-        $teamMember->setRole(TeamMemberRole::PLAYER);
+        $teamMember->setRole(TeamMemberRole::ATHLETE);
         $teamMember->setIsActive(true);
 
         $this->entityManager->persist($teamMember);
@@ -381,8 +381,8 @@ class DocumentTestFixtures
         $seniorTeam = new Team();
         $seniorTeam->setName('Équipe Senior');
         $seniorTeam->setClub($tennisClub);
-        $seniorTeam->setMinAge(18);
-        $seniorTeam->setMaxAge(null);
+        $seniorTeam->setMinBirthYear(null); // Pas de limite d'âge maximum
+        $seniorTeam->setMaxBirthYear(2007); // 2025 - 18 = âge min 18 ans
         $seniorTeam->setIsActive(true);
 
         $this->entityManager->persist($paul);

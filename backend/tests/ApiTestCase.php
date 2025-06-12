@@ -11,6 +11,7 @@ use App\Entity\User;
 use App\Entity\UserAuthentication;
 use App\Entity\RefreshToken;
 use App\Enum\AuthProvider;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 /**
  * Classe de base pour tous les tests API
@@ -26,15 +27,27 @@ abstract class ApiTestCase extends WebTestCase
     {
         parent::setUp();
         
-        $this->client = static::createClient();
-        $this->entityManager = static::getContainer()->get(EntityManagerInterface::class);
-        $this->jwtManager = static::getContainer()->get(JWTTokenManagerInterface::class);
+        // Créer le client seulement s'il n'existe pas
+        if (!isset($this->client)) {
+            $this->client = static::createClient();
+        }
+        
+        // Obtenir les services du container
+        $container = static::getContainer();
+        $this->entityManager = $container->get(EntityManagerInterface::class);
+        $this->jwtManager = $container->get(JWTTokenManagerInterface::class);
+        
+        // Vérifier que l'EntityManager est ouvert
+        if (!$this->entityManager->isOpen()) {
+            // Réinitialiser l'EntityManager s'il est fermé
+            $this->entityManager = $container->get('doctrine')->resetManager();
+        }
         
         // Configuration pour les tests
         $this->client->setServerParameter('CONTENT_TYPE', 'application/json');
         $this->client->setServerParameter('HTTP_ACCEPT', 'application/json');
         
-        // Nettoyer les données existantes au lieu d'utiliser des transactions
+        // Nettoyer les données existantes
         $this->clearTestData();
     }
 
@@ -44,7 +57,7 @@ abstract class ApiTestCase extends WebTestCase
         $this->clearTestData();
         
         // Nettoyer l'EntityManager
-        if ($this->entityManager) {
+        if (isset($this->entityManager) && $this->entityManager->isOpen()) {
             $this->entityManager->clear();
         }
         
@@ -57,6 +70,11 @@ abstract class ApiTestCase extends WebTestCase
      */
     protected function authenticateUser(User $user): string
     {
+        // Vérifier si l'EntityManager est ouvert
+        if (!$this->entityManager->isOpen()) {
+            $this->entityManager = static::getContainer()->get('doctrine')->resetManager();
+        }
+
         // Vérifier si une UserAuthentication existe déjà
         $userAuth = $this->entityManager->getRepository(UserAuthentication::class)
             ->findOneBy(['user' => $user, 'provider' => AuthProvider::EMAIL]);
@@ -67,7 +85,7 @@ abstract class ApiTestCase extends WebTestCase
             $userAuth->setUser($user)
                      ->setProvider(AuthProvider::EMAIL)
                      ->setEmail($user->getEmail())
-                     ->setPassword(password_hash('password123', PASSWORD_DEFAULT)) // Mot de passe par défaut pour les tests
+                     ->setPassword(password_hash('password123', PASSWORD_DEFAULT))
                      ->setIsActive(true);
             
             $this->entityManager->persist($userAuth);
@@ -128,12 +146,43 @@ abstract class ApiTestCase extends WebTestCase
         
         $headers = ['HTTP_AUTHORIZATION' => 'Bearer ' . $token];
         
+        // Convertir les chemins de fichiers en objets UploadedFile
+        $uploadedFiles = [];
+        foreach ($files as $fieldName => $filePath) {
+            if (is_string($filePath) && file_exists($filePath)) {
+                $uploadedFiles[$fieldName] = $this->createUploadedFile($filePath);
+            } elseif ($filePath instanceof UploadedFile) {
+                $uploadedFiles[$fieldName] = $filePath;
+            }
+        }
+        
         $this->client->request(
             $method,
             $uri,
             $formData,
-            $files,
+            $uploadedFiles,
             $headers
+        );
+    }
+
+    /**
+     * Crée un objet UploadedFile à partir d'un chemin de fichier
+     */
+    protected function createUploadedFile(string $filePath, ?string $originalName = null, ?string $mimeType = null): UploadedFile
+    {
+        if (!file_exists($filePath)) {
+            throw new \InvalidArgumentException("Le fichier {$filePath} n'existe pas");
+        }
+        
+        $originalName = $originalName ?: basename($filePath);
+        $mimeType = $mimeType ?: mime_content_type($filePath) ?: 'application/octet-stream';
+        
+        return new UploadedFile(
+            $filePath,
+            $originalName,
+            $mimeType,
+            null,
+            true // test mode
         );
     }
 
@@ -194,8 +243,16 @@ abstract class ApiTestCase extends WebTestCase
      */
     protected function createTestUser(string $email, array $roles = ['ROLE_USER'], array $extraData = []): User
     {
+        // Vérifier si l'EntityManager est ouvert
+        if (!$this->entityManager->isOpen()) {
+            $this->entityManager = static::getContainer()->get('doctrine')->resetManager();
+        }
+
+        // Ajouter un suffixe unique basé sur le timestamp pour éviter les doublons
+        $uniqueEmail = $this->makeEmailUnique($email);
+
         $user = new User();
-        $user->setEmail($email);
+        $user->setEmail($uniqueEmail);
         $user->setFirstName($extraData['firstName'] ?? 'Test');
         $user->setLastName($extraData['lastName'] ?? 'User');
         $user->setRoles($roles);
@@ -224,7 +281,7 @@ abstract class ApiTestCase extends WebTestCase
             $userAuth = new UserAuthentication();
             $userAuth->setUser($user)
                      ->setProvider(AuthProvider::EMAIL)
-                     ->setEmail($email)
+                     ->setEmail($uniqueEmail)
                      ->setPassword(password_hash($extraData['password'] ?? 'password123', PASSWORD_DEFAULT))
                      ->setIsActive(true);
             
@@ -236,62 +293,72 @@ abstract class ApiTestCase extends WebTestCase
     }
 
     /**
+     * Rend un email unique en ajoutant un timestamp
+     */
+    private function makeEmailUnique(string $email): string
+    {
+        $parts = explode('@', $email);
+        if (count($parts) === 2) {
+            return $parts[0] . '.' . time() . '.' . mt_rand(1000, 9999) . '@' . $parts[1];
+        }
+        return $email . '.' . time() . '.' . mt_rand(1000, 9999);
+    }
+
+    /**
      * Vide les données de test de la base
      */
     protected function clearTestData(): void
     {
-        // Supprimer les données de test avec des emails de test
-        $testEmailPatterns = [
-            'test.com',
-            'example.com',
-            'debug.',
-            'nouveau.user',
-            'api.test'
-        ];
-
-        foreach ($testEmailPatterns as $pattern) {
-            // Supprimer les RefreshTokens associés aux utilisateurs de test
-            $testUsers = $this->entityManager->getRepository(User::class)
-                ->createQueryBuilder('u')
-                ->where('u.email LIKE :pattern')
-                ->setParameter('pattern', '%' . $pattern . '%')
-                ->getQuery()
-                ->getResult();
-            
-            foreach ($testUsers as $user) {
-                $refreshTokens = $this->entityManager->getRepository(RefreshToken::class)
-                    ->findBy(['user' => $user]);
-                
-                foreach ($refreshTokens as $refreshToken) {
-                    $this->entityManager->remove($refreshToken);
-                }
-            }
-            
-            // Supprimer les UserAuthentication de test
-            $testAuths = $this->entityManager->getRepository(UserAuthentication::class)
-                ->createQueryBuilder('ua')
-                ->where('ua.email LIKE :pattern')
-                ->setParameter('pattern', '%' . $pattern . '%')
-                ->getQuery()
-                ->getResult();
-            
-            foreach ($testAuths as $auth) {
-                $this->entityManager->remove($auth);
-            }
-
-            // Supprimer les Users de test
-            foreach ($testUsers as $user) {
-                $this->entityManager->remove($user);
-            }
+        // Vérifier si l'EntityManager est ouvert
+        if (!$this->entityManager->isOpen()) {
+            $this->entityManager = static::getContainer()->get('doctrine')->resetManager();
         }
 
         try {
+            // Supprimer tous les utilisateurs de test (avec patterns de test)
+            $qb = $this->entityManager->createQueryBuilder();
+            $testUsers = $qb->select('u')
+                ->from(User::class, 'u')
+                ->where('u.email LIKE :testPattern1')
+                ->orWhere('u.email LIKE :testPattern2') 
+                ->orWhere('u.email LIKE :testPattern3')
+                ->orWhere('u.email LIKE :testPattern4')
+                ->setParameter('testPattern1', '%.test.com%')
+                ->setParameter('testPattern2', '%@test.com%')
+                ->setParameter('testPattern3', '%@example.com%')
+                ->setParameter('testPattern4', '%debug.%')
+                ->getQuery()
+                ->getResult();
+
+            foreach ($testUsers as $user) {
+                // Supprimer les refresh tokens associés
+                $refreshTokens = $this->entityManager->getRepository(RefreshToken::class)
+                    ->findBy(['user' => $user]);
+                foreach ($refreshTokens as $token) {
+                    $this->entityManager->remove($token);
+                }
+
+                // Supprimer les authentifications associées
+                $auths = $this->entityManager->getRepository(UserAuthentication::class)
+                    ->findBy(['user' => $user]);
+                foreach ($auths as $auth) {
+                    $this->entityManager->remove($auth);
+                }
+
+                // Supprimer l'utilisateur
+                $this->entityManager->remove($user);
+            }
+            
             $this->entityManager->flush();
+            $this->entityManager->clear();
+            
         } catch (\Exception $e) {
-            // Ignorer les erreurs de suppression
+            // En cas d'erreur, réinitialiser l'EntityManager
+            if (!$this->entityManager->isOpen()) {
+                $this->entityManager = static::getContainer()->get('doctrine')->resetManager();
+            }
+            $this->entityManager->clear();
         }
-        
-        $this->entityManager->clear();
     }
 
     /**

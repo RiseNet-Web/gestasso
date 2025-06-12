@@ -130,4 +130,4 @@ class DocumentVoter extends Voter
 
         return false;
     }
-} 0
+}

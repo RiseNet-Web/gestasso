@@ -179,7 +179,7 @@ class DocumentExpirationTest extends ApiTestCase
         // Given: Un type de document sans expiration (autorisation parentale)
         $autorisationType = new DocumentType();
         $autorisationType->setName('Autorisation parentale');
-        $autorisationType->setType(DocumentTypeEnum::PARENTAL_AUTHORIZATION);
+        $autorisationType->setType(DocumentTypeEnum::AUTHORIZATION);
         $autorisationType->setTeam($this->u18Team);
         $autorisationType->setIsRequired(true);
         $autorisationType->setHasExpirationDate(false); // Pas d'expiration
@@ -286,9 +286,10 @@ class DocumentExpirationTest extends ApiTestCase
         $this->u18Team = new Team();
         $this->u18Team->setName('U18 Filles');
         $this->u18Team->setClub($this->racingClub);
-        $this->u18Team->setMinAge(16);
-        $this->u18Team->setMaxAge(18);
+        $this->u18Team->setMinBirthYear(2007); // 2025 - 18 = âge max 18 ans
+        $this->u18Team->setMaxBirthYear(2009); // 2025 - 16 = âge min 16 ans
         $this->u18Team->setGender('F');
+        $this->u18Team->setIsActive(true);
 
         $this->certificatType = new DocumentType();
         $this->certificatType->setName('Certificat médical');
@@ -302,7 +303,7 @@ class DocumentExpirationTest extends ApiTestCase
         $teamMember = new TeamMember();
         $teamMember->setUser($this->emma);
         $teamMember->setTeam($this->u18Team);
-        $teamMember->setRole(TeamMemberRole::PLAYER);
+        $teamMember->setRole(TeamMemberRole::ATHLETE);
         $teamMember->setIsActive(true);
 
         $this->entityManager->persist($this->racingClub);

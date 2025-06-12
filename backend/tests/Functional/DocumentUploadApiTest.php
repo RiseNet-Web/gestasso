@@ -158,11 +158,15 @@ class DocumentUploadApiTest extends ApiTestCase
         // When: Tentative d'upload sans authentification
         $testFile = $this->createTestPdfFile('test.pdf', 1);
 
+        // Pour les requêtes multipart non authentifiées, on utilise directement client->request
+        // mais on doit créer l'UploadedFile correctement
+        $uploadedFile = $this->createUploadedFile($testFile);
+
         $this->client->request(
             'POST',
             '/api/documents',
             ['documentTypeId' => 1],
-            ['document' => $testFile],
+            ['document' => $uploadedFile],
             ['CONTENT_TYPE' => 'multipart/form-data']
         );
 
@@ -241,7 +245,7 @@ class DocumentUploadApiTest extends ApiTestCase
         // Créer un type de document pour photo
         $photoType = new DocumentType();
         $photoType->setName('Photo d\'identité');
-        $photoType->setType(DocumentTypeEnum::IDENTITY_PHOTO);
+        $photoType->setType(DocumentTypeEnum::PHOTO);
         $photoType->setTeam($clubData['team']);
         $photoType->setIsRequired(false);
         $photoType->setHasExpirationDate(false);
@@ -301,9 +305,10 @@ class DocumentUploadApiTest extends ApiTestCase
         $u18Team = new Team();
         $u18Team->setName('U18 Filles');
         $u18Team->setClub($racingClub);
-        $u18Team->setMinAge(16);
-        $u18Team->setMaxAge(18);
+        $u18Team->setMinBirthYear(2007); // 2025 - 18 = âge max 18 ans
+        $u18Team->setMaxBirthYear(2009); // 2025 - 16 = âge min 16 ans
         $u18Team->setGender('F');
+        $u18Team->setIsActive(true);
 
         $this->entityManager->persist($u18Team);
 
@@ -311,7 +316,7 @@ class DocumentUploadApiTest extends ApiTestCase
         $teamMember = new TeamMember();
         $teamMember->setUser($emma);
         $teamMember->setTeam($u18Team);
-        $teamMember->setRole(TeamMemberRole::PLAYER);
+        $teamMember->setRole(TeamMemberRole::ATHLETE);
         $teamMember->setIsActive(true);
 
         $this->entityManager->persist($teamMember);

@@ -292,9 +292,10 @@ class DocumentWorkflowTest extends ApiTestCase
         $this->u18Team = new Team();
         $this->u18Team->setName('U18 Filles');
         $this->u18Team->setClub($this->racingClub);
-        $this->u18Team->setMinAge(16);
-        $this->u18Team->setMaxAge(18);
+        $this->u18Team->setMinBirthYear(2007); // 2025 - 18 = âge max 18 ans
+        $this->u18Team->setMaxBirthYear(2009); // 2025 - 16 = âge min 16 ans
         $this->u18Team->setGender('F');
+        $this->u18Team->setIsActive(true);
 
         $this->certificatType = new DocumentType();
         $this->certificatType->setName('Certificat médical');
@@ -318,7 +319,7 @@ class DocumentWorkflowTest extends ApiTestCase
         $teamMember = new TeamMember();
         $teamMember->setUser($user);
         $teamMember->setTeam($team);
-        $teamMember->setRole(TeamMemberRole::PLAYER);
+        $teamMember->setRole(TeamMemberRole::ATHLETE);
         $teamMember->setIsActive(true);
 
         $this->entityManager->persist($teamMember);
@@ -445,9 +446,10 @@ class DocumentWorkflowTest extends ApiTestCase
         $u16Team = new Team();
         $u16Team->setName('U16 Garçons');
         $u16Team->setClub($this->racingClub);
-        $u16Team->setMinAge(14);
-        $u16Team->setMaxAge(16);
+        $u16Team->setMinBirthYear(2009); // 2025 - 16 = âge max 16 ans
+        $u16Team->setMaxBirthYear(2011); // 2025 - 14 = âge min 14 ans
         $u16Team->setGender('M');
+        $u16Team->setIsActive(true);
 
         $this->entityManager->persist($u16Team);
         $this->entityManager->flush();
