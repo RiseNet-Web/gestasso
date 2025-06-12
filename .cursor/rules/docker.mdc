@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Toutes les commanndes docker doivent être utilisés depuis le dossier infrastructure.
