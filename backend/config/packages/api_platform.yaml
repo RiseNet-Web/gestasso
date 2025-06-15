@@ -2,6 +2,8 @@ api_platform:
     title: 'GestAsso API'
     description: 'API de gestion de clubs sportifs'
     version: '1.0.0'
+    # Activer le support des contrôleurs Symfony personnalisés avec annotations OpenAPI
+    use_symfony_listeners: true
     # Forcer l'inclusion des contrôleurs personnalisés avec annotations OpenAPI
     mapping:
         paths:

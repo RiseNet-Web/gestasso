@@ -48,3 +48,9 @@ services:
         arguments:
             $uploadsDirectory: '%kernel.project_dir%'
 
+    # Décorateur OpenAPI pour inclure les contrôleurs personnalisés
+    App\OpenApi\OpenApiFactory:
+        decorates: 'api_platform.openapi.factory'
+        arguments: ['@App\OpenApi\OpenApiFactory.inner']
+        autoconfigure: false
+
