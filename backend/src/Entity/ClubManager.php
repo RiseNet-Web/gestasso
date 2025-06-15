@@ -2,11 +2,8 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\Get;
-use ApiPlatform\Metadata\GetCollection;
-use ApiPlatform\Metadata\Post;
-use ApiPlatform\Metadata\Delete;
+
+
 use App\Repository\ClubManagerRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -14,28 +11,6 @@ use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: ClubManagerRepository::class)]
 #[ORM\HasLifecycleCallbacks]
-#[ApiResource(
-    operations: [
-        new GetCollection(
-            security: "is_granted('ROLE_USER')",
-            normalizationContext: ['groups' => ['club_manager:read']]
-        ),
-        new Get(
-            security: "is_granted('CLUB_VIEW', object.getClub())",
-            normalizationContext: ['groups' => ['club_manager:read', 'club_manager:details']]
-        ),
-        new Post(
-            security: "is_granted('CLUB_MANAGE_MEMBERS', object.getClub())",
-            denormalizationContext: ['groups' => ['club_manager:create']],
-            normalizationContext: ['groups' => ['club_manager:read']]
-        ),
-        new Delete(
-            security: "is_granted('CLUB_MANAGE_MEMBERS', object.getClub())"
-        )
-    ],
-    normalizationContext: ['groups' => ['club_manager:read']],
-    denormalizationContext: ['groups' => ['club_manager:create']]
-)]
 class ClubManager
 {
     #[ORM\Id]

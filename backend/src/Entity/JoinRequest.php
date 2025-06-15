@@ -2,12 +2,8 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\Get;
-use ApiPlatform\Metadata\GetCollection;
-use ApiPlatform\Metadata\Post;
-use ApiPlatform\Metadata\Put;
-use ApiPlatform\Metadata\Delete;
+
+
 use App\Enum\JoinRequestStatus;
 use App\Enum\TeamMemberRole;
 use App\Repository\JoinRequestRepository;
@@ -22,31 +18,6 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(columns: ['team_id', 'status'], name: 'idx_team_status')]
 #[ORM\Index(columns: ['club_id', 'status'], name: 'idx_club_status')]
 #[ORM\Index(columns: ['reviewed_by_id', 'reviewed_at'], name: 'idx_reviewed_by_at')]
-#[ApiResource(
-    operations: [
-        new GetCollection(
-            security: "is_granted('ROLE_USER')",
-            normalizationContext: ['groups' => ['join_request:read']]
-        ),
-        new Get(
-            security: "is_granted('JOIN_REQUEST_VIEW', object)",
-            normalizationContext: ['groups' => ['join_request:read', 'join_request:details']]
-        ),
-        new Post(
-            security: "is_granted('ROLE_USER')",
-            denormalizationContext: ['groups' => ['join_request:create']],
-            normalizationContext: ['groups' => ['join_request:read']]
-        ),
-        new Put(
-            security: "is_granted('JOIN_REQUEST_REVIEW', object)",
-            denormalizationContext: ['groups' => ['join_request:review']],
-            normalizationContext: ['groups' => ['join_request:read']]
-        ),
-        new Delete(
-            security: "is_granted('JOIN_REQUEST_DELETE', object)"
-        )
-    ]
-)]
 class JoinRequest
 {
     #[ORM\Id]

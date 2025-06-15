@@ -2,12 +2,7 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\Get;
-use ApiPlatform\Metadata\GetCollection;
-use ApiPlatform\Metadata\Post;
-use ApiPlatform\Metadata\Put;
-use ApiPlatform\Metadata\Delete;
+
 use App\Repository\UserRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -22,32 +17,6 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: '`user`')]
 #[ORM\HasLifecycleCallbacks]
 #[UniqueEntity(fields: ['email'], message: 'Un utilisateur avec cet email existe déjà.')]
-#[ApiResource(
-    operations: [
-        new GetCollection(
-            security: "is_granted('ROLE_USER')",
-            normalizationContext: ['groups' => ['user:read']]
-        ),
-        new Get(
-            security: "is_granted('ROLE_USER') and (object == user or is_granted('ROLE_CLUB_MANAGER'))",
-            normalizationContext: ['groups' => ['user:read', 'user:details']]
-        ),
-        new Post(
-            denormalizationContext: ['groups' => ['user:create']],
-            normalizationContext: ['groups' => ['user:read']]
-        ),
-        new Put(
-            security: "is_granted('ROLE_USER') and object == user",
-            denormalizationContext: ['groups' => ['user:update']],
-            normalizationContext: ['groups' => ['user:read']]
-        ),
-        new Delete(
-            security: "is_granted('ROLE_ADMIN') or object == user"
-        )
-    ],
-    normalizationContext: ['groups' => ['user:read']],
-    denormalizationContext: ['groups' => ['user:create']]
-)]
 class User implements UserInterface
 {
     #[ORM\Id]
@@ -59,59 +28,47 @@ class User implements UserInterface
     #[ORM\Column(length: 180, unique: true)]
     #[Assert\NotBlank(message: 'L\'email est obligatoire.')]
     #[Assert\Email(message: 'L\'email doit être valide.')]
-    #[Groups(['user:read', 'user:create', 'user:update', 'club:read', 'team:read'])]
     private ?string $email = null;
 
     #[ORM\Column]
-    #[Groups(['user:details'])]
     private array $roles = [];
 
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank(message: 'Le prénom est obligatoire.')]
     #[Assert\Length(max: 100, maxMessage: 'Le prénom ne peut pas dépasser {{ limit }} caractères.')]
-    #[Groups(['user:read', 'user:create', 'user:update', 'club:read', 'team:read'])]
     private ?string $firstName = null;
 
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank(message: 'Le nom est obligatoire.')]
     #[Assert\Length(max: 100, maxMessage: 'Le nom ne peut pas dépasser {{ limit }} caractères.')]
-    #[Groups(['user:read', 'user:create', 'user:update', 'club:read', 'team:read'])]
     private ?string $lastName = null;
 
     #[ORM\Column(length: 20, nullable: true)]
     #[Assert\Regex(pattern: '/^[0-9+\-\s()]+$/', message: 'Le numéro de téléphone n\'est pas valide.')]
-    #[Groups(['user:read', 'user:create', 'user:update', 'user:details'])]
     private ?string $phone = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true)]
-    #[Groups(['user:read', 'user:create', 'user:update', 'user:details'])]
     private ?\DateTimeInterface $dateOfBirth = null;
 
     #[ORM\Column(length: 20, nullable: true)]
     #[Assert\Choice(choices: ['owner', 'member'], message: 'Le type d\'onboarding doit être "owner" ou "member".')]
-    #[Groups(['user:read', 'user:create', 'user:update', 'user:details'])]
     private ?string $onboardingType = null;
 
     #[ORM\Column]
-    #[Groups(['user:read', 'user:details'])]
     private bool $onboardingCompleted = false;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
-    #[Groups(['user:details'])]
     private ?\DateTimeInterface $createdAt = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
-    #[Groups(['user:details'])]
     private ?\DateTimeInterface $updatedAt = null;
 
     #[ORM\Column]
-    #[Groups(['user:details'])]
     private ?bool $isActive = true;
 
     // Relations
 
     #[ORM\OneToMany(mappedBy: 'owner', targetEntity: Club::class)]
-    #[Groups(['user:details'])]
     private Collection $ownedClubs;
 
     #[ORM\OneToMany(mappedBy: 'user', targetEntity: ClubManager::class)]

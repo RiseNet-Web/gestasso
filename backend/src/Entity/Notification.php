@@ -2,10 +2,8 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\Get;
-use ApiPlatform\Metadata\GetCollection;
-use ApiPlatform\Metadata\Put;
+
+
 use App\Enum\NotificationType;
 use App\Repository\NotificationRepository;
 use Doctrine\DBAL\Types\Types;
@@ -15,25 +13,6 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: NotificationRepository::class)]
 #[ORM\HasLifecycleCallbacks]
-#[ApiResource(
-    operations: [
-        new GetCollection(
-            security: "is_granted('ROLE_USER') and user == object.getUser()",
-            normalizationContext: ['groups' => ['notification:read']]
-        ),
-        new Get(
-            security: "is_granted('ROLE_USER') and user == object.getUser()",
-            normalizationContext: ['groups' => ['notification:read', 'notification:details']]
-        ),
-        new Put(
-            security: "is_granted('ROLE_USER') and user == object.getUser()",
-            denormalizationContext: ['groups' => ['notification:update']],
-            normalizationContext: ['groups' => ['notification:read']]
-        )
-    ],
-    normalizationContext: ['groups' => ['notification:read']],
-    denormalizationContext: ['groups' => ['notification:update']]
-)]
 class Notification
 {
 

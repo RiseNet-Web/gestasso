@@ -2,12 +2,17 @@ api_platform:
     title: 'GestAsso API'
     description: 'API de gestion de clubs sportifs'
     version: '1.0.0'
+    # Forcer l'inclusion des contrôleurs personnalisés avec annotations OpenAPI
+    mapping:
+        paths:
+            - '%kernel.project_dir%/src/Controller'
     defaults:
         stateless: true
         cache_headers:
             vary: ['Content-Type', 'Authorization', 'Origin']
     enable_swagger_ui: true
     enable_re_doc: true
+    enable_docs: true
     docs_formats:
         jsonopenapi: ['application/vnd.openapi+json']
         html: ['text/html']

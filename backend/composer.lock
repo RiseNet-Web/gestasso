@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c8dee8fe12c6298796b5c5100e7a28a5",
+    "content-hash": "0794a2d8fd4129682dfa10c858bb9448",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -3311,129 +3311,6 @@
             "time": "2025-01-06T16:34:57+00:00"
         },
         {
-            "name": "nelmio/api-doc-bundle",
-            "version": "v5.3.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/nelmio/NelmioApiDocBundle.git",
-                "reference": "60429836bab244d3c92f37b1c329af89aafd786f"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/nelmio/NelmioApiDocBundle/zipball/60429836bab244d3c92f37b1c329af89aafd786f",
-                "reference": "60429836bab244d3c92f37b1c329af89aafd786f",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=8.1",
-                "phpdocumentor/reflection-docblock": "^5.0",
-                "phpdocumentor/type-resolver": "^1.8.2",
-                "psr/cache": "^1.0 || ^2.0 || ^3.0",
-                "psr/container": "^1.0 || ^2.0",
-                "psr/log": "^1.0 || ^2.0 || ^3.0",
-                "symfony/config": "^6.4 || ^7.1",
-                "symfony/console": "^6.4 || ^7.1",
-                "symfony/dependency-injection": "^6.4 || ^7.1",
-                "symfony/deprecation-contracts": "^2.1 || ^3",
-                "symfony/framework-bundle": "^6.4 || ^7.1",
-                "symfony/http-foundation": "^6.4 || ^7.1",
-                "symfony/http-kernel": "^6.4 || ^7.1",
-                "symfony/options-resolver": "^6.4 || ^7.1",
-                "symfony/property-info": "^6.4 || ^7.1",
-                "symfony/routing": "^6.4 || ^7.1",
-                "zircote/swagger-php": "^4.11.1 || ^5.0"
-            },
-            "conflict": {
-                "zircote/swagger-php": "4.8.7"
-            },
-            "require-dev": {
-                "api-platform/core": "^3.2",
-                "friendsofphp/php-cs-fixer": "^3.52",
-                "friendsofsymfony/rest-bundle": "^3.2.0",
-                "jms/serializer": "^3.32",
-                "jms/serializer-bundle": "^5.5",
-                "phpstan/phpstan": "^1.10",
-                "phpstan/phpstan-phpunit": "^1.3",
-                "phpstan/phpstan-strict-rules": "^1.5",
-                "phpstan/phpstan-symfony": "^1.3",
-                "phpunit/phpunit": "^10.5",
-                "symfony/asset": "^6.4 || ^7.1",
-                "symfony/browser-kit": "^6.4 || ^7.1",
-                "symfony/cache": "^6.4 || ^7.1",
-                "symfony/dom-crawler": "^6.4 || ^7.1",
-                "symfony/expression-language": "^6.4 || ^7.1",
-                "symfony/finder": "^6.4 || ^7.1",
-                "symfony/form": "^6.4 || ^7.1",
-                "symfony/phpunit-bridge": "^6.4 || ^7.1",
-                "symfony/property-access": "^6.4 || ^7.1",
-                "symfony/security-csrf": "^6.4 || ^7.1",
-                "symfony/security-http": "^6.4 || ^7.1",
-                "symfony/serializer": "^6.4 || ^7.1",
-                "symfony/stopwatch": "^6.4 || ^7.1",
-                "symfony/templating": "^6.4 || ^7.1",
-                "symfony/translation": "^6.4 || ^7.1",
-                "symfony/twig-bundle": "^6.4 || ^7.1",
-                "symfony/uid": "^6.4 || ^7.1",
-                "symfony/validator": "^6.4 || ^7.1",
-                "willdurand/hateoas-bundle": "^2.7",
-                "willdurand/negotiation": "^3.0"
-            },
-            "suggest": {
-                "api-platform/core": "For using an API oriented framework.",
-                "friendsofsymfony/rest-bundle": "For using the parameters annotations.",
-                "jms/serializer-bundle": "For describing your models.",
-                "symfony/asset": "For using the Swagger UI.",
-                "symfony/cache": "For using a PSR-6 compatible cache implementation with the API doc generator.",
-                "symfony/form": "For describing your form type models.",
-                "symfony/monolog-bundle": "For using a PSR-3 compatible logger implementation with the API PHP describer.",
-                "symfony/security-csrf": "For using csrf protection tokens in forms.",
-                "symfony/serializer": "For describing your models.",
-                "symfony/twig-bundle": "For using the Swagger UI.",
-                "symfony/validator": "For describing the validation constraints in your models.",
-                "willdurand/hateoas-bundle": "For extracting HATEOAS metadata."
-            },
-            "type": "symfony-bundle",
-            "extra": {
-                "branch-alias": {
-                    "dev-4.x": "4.x-dev",
-                    "dev-5.x": "5.x-dev"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Nelmio\\ApiDocBundle\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Symfony Community",
-                    "homepage": "https://github.com/nelmio/NelmioApiDocBundle/contributors"
-                }
-            ],
-            "description": "Generates documentation for your REST API from attributes",
-            "keywords": [
-                "api",
-                "doc",
-                "documentation",
-                "rest"
-            ],
-            "support": {
-                "issues": "https://github.com/nelmio/NelmioApiDocBundle/issues",
-                "source": "https://github.com/nelmio/NelmioApiDocBundle/tree/v5.3.0"
-            },
-            "funding": [
-                {
-                    "url": "https://github.com/DjordyKoert",
-                    "type": "github"
-                }
-            ],
-            "time": "2025-05-24T13:30:55+00:00"
-        },
-        {
             "name": "nelmio/cors-bundle",
             "version": "2.5.0",
             "source": {
@@ -6189,73 +6066,6 @@
                 }
             ],
             "time": "2025-04-27T13:34:41+00:00"
-        },
-        {
-            "name": "symfony/options-resolver",
-            "version": "v7.2.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/symfony/options-resolver.git",
-                "reference": "7da8fbac9dcfef75ffc212235d76b2754ce0cf50"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/symfony/options-resolver/zipball/7da8fbac9dcfef75ffc212235d76b2754ce0cf50",
-                "reference": "7da8fbac9dcfef75ffc212235d76b2754ce0cf50",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=8.2",
-                "symfony/deprecation-contracts": "^2.5|^3"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Symfony\\Component\\OptionsResolver\\": ""
-                },
-                "exclude-from-classmap": [
-                    "/Tests/"
-                ]
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Fabien Potencier",
-                    "email": "fabien@symfony.com"
-                },
-                {
-                    "name": "Symfony Community",
-                    "homepage": "https://symfony.com/contributors"
-                }
-            ],
-            "description": "Provides an improved replacement for the array_replace PHP function",
-            "homepage": "https://symfony.com",
-            "keywords": [
-                "config",
-                "configuration",
-                "options"
-            ],
-            "support": {
-                "source": "https://github.com/symfony/options-resolver/tree/v7.2.0"
-            },
-            "funding": [
-                {
-                    "url": "https://symfony.com/sponsor",
-                    "type": "custom"
-                },
-                {
-                    "url": "https://github.com/fabpot",
-                    "type": "github"
-                },
-                {
-                    "url": "https://tidelift.com/funding/github/packagist/symfony/symfony",
-                    "type": "tidelift"
-                }
-            ],
-            "time": "2024-11-20T11:17:29+00:00"
         },
         {
             "name": "symfony/password-hasher",

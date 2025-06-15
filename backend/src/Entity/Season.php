@@ -2,12 +2,8 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\Get;
-use ApiPlatform\Metadata\GetCollection;
-use ApiPlatform\Metadata\Post;
-use ApiPlatform\Metadata\Put;
-use ApiPlatform\Metadata\Delete;
+
+
 use App\Repository\SeasonRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -18,33 +14,6 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: SeasonRepository::class)]
 #[ORM\HasLifecycleCallbacks]
-#[ApiResource(
-    operations: [
-        new GetCollection(
-            security: "is_granted('ROLE_USER')",
-            normalizationContext: ['groups' => ['season:read']]
-        ),
-        new Get(
-            security: "is_granted('CLUB_VIEW', object.getClub())",
-            normalizationContext: ['groups' => ['season:read', 'season:details']]
-        ),
-        new Post(
-            security: "is_granted('CLUB_EDIT', object.getClub())",
-            denormalizationContext: ['groups' => ['season:create']],
-            normalizationContext: ['groups' => ['season:read']]
-        ),
-        new Put(
-            security: "is_granted('CLUB_EDIT', object.getClub())",
-            denormalizationContext: ['groups' => ['season:update']],
-            normalizationContext: ['groups' => ['season:read']]
-        ),
-        new Delete(
-            security: "is_granted('CLUB_EDIT', object.getClub())"
-        )
-    ],
-    normalizationContext: ['groups' => ['season:read']],
-    denormalizationContext: ['groups' => ['season:create']]
-)]
 class Season
 {
     #[ORM\Id]

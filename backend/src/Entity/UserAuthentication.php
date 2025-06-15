@@ -2,12 +2,8 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\Get;
-use ApiPlatform\Metadata\GetCollection;
-use ApiPlatform\Metadata\Post;
-use ApiPlatform\Metadata\Put;
-use ApiPlatform\Metadata\Delete;
+
+
 use App\Enum\AuthProvider;
 use App\Repository\UserAuthenticationRepository;
 use Doctrine\DBAL\Types\Types;
@@ -20,31 +16,6 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(columns: ['provider', 'provider_id'], name: 'idx_provider_provider_id')]
 #[ORM\Index(columns: ['provider', 'email'], name: 'idx_provider_email')]
 #[ORM\Index(columns: ['user_id', 'is_active'], name: 'idx_user_active')]
-#[ApiResource(
-    operations: [
-        new GetCollection(
-            security: "is_granted('ROLE_USER') and user == object.getUser()",
-            normalizationContext: ['groups' => ['user_auth:read']]
-        ),
-        new Get(
-            security: "is_granted('ROLE_USER') and user == object.getUser()",
-            normalizationContext: ['groups' => ['user_auth:read', 'user_auth:details']]
-        ),
-        new Post(
-            security: "is_granted('ROLE_USER')",
-            denormalizationContext: ['groups' => ['user_auth:create']],
-            normalizationContext: ['groups' => ['user_auth:read']]
-        ),
-        new Put(
-            security: "is_granted('ROLE_USER') and user == object.getUser()",
-            denormalizationContext: ['groups' => ['user_auth:update']],
-            normalizationContext: ['groups' => ['user_auth:read']]
-        ),
-        new Delete(
-            security: "is_granted('ROLE_USER') and user == object.getUser()"
-        )
-    ]
-)]
 class UserAuthentication
 {
     #[ORM\Id]

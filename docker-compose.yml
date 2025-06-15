@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  # Base de données PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: gestasso_postgres
+    environment:
+      POSTGRES_DB: gestasso
+      POSTGRES_USER: gestasso
+      POSTGRES_PASSWORD: gestasso_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - gestasso_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gestasso -d gestasso"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis pour le cache et les sessions
+  redis:
+    image: redis:7-alpine
+    container_name: gestasso_redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - gestasso_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Application Symfony (API Backend)
+  symfony:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gestasso_symfony
+    environment:
+      APP_ENV: dev
+      APP_SECRET: your-secret-key-here
+      DATABASE_URL: postgresql://gestasso:gestasso_password@postgres:5432/gestasso
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET_KEY: '%kernel.project_dir%/config/jwt/private.pem'
+      JWT_PUBLIC_KEY: '%kernel.project_dir%/config/jwt/public.pem'
+      JWT_PASSPHRASE: your-jwt-passphrase
+      CORS_ALLOW_ORIGIN: http://localhost:3000
+    volumes:
+      - ./backend:/var/www/html
+      - symfony_var:/var/www/html/var
+    ports:
+      - "8000:8000"
+    networks:
+      - gestasso_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Application SvelteKit (Frontend)
+  sveltekit:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: gestasso_sveltekit
+    environment:
+      VITE_API_URL: http://localhost:8000/api
+      NODE_ENV: development
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    networks:
+      - gestasso_network
+    depends_on:
+      - symfony
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx pour le reverse proxy (optionnel)
+  nginx:
+    image: nginx:alpine
+    container_name: gestasso_nginx
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    networks:
+      - gestasso_network
+    depends_on:
+      - symfony
+      - sveltekit
+
+volumes:
+  postgres_data:
+  redis_data:
+  symfony_var:
+
+networks:
+  gestasso_network:
+    driver: bridge 

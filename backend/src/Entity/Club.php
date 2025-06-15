@@ -2,12 +2,7 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\Get;
-use ApiPlatform\Metadata\GetCollection;
-use ApiPlatform\Metadata\Post;
-use ApiPlatform\Metadata\Put;
-use ApiPlatform\Metadata\Delete;
+
 use App\Repository\ClubRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -18,33 +13,6 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: ClubRepository::class)]
 #[ORM\HasLifecycleCallbacks]
-#[ApiResource(
-    operations: [
-        new GetCollection(
-            security: "is_granted('ROLE_USER')",
-            normalizationContext: ['groups' => ['club:read']]
-        ),
-        new Get(
-            security: "is_granted('CLUB_VIEW', object)",
-            normalizationContext: ['groups' => ['club:read', 'club:details']]
-        ),
-        new Post(
-            security: "is_granted('ROLE_USER')",
-            denormalizationContext: ['groups' => ['club:create']],
-            normalizationContext: ['groups' => ['club:read']]
-        ),
-        new Put(
-            security: "is_granted('CLUB_EDIT', object)",
-            denormalizationContext: ['groups' => ['club:update']],
-            normalizationContext: ['groups' => ['club:read']]
-        ),
-        new Delete(
-            security: "is_granted('CLUB_DELETE', object)"
-        )
-    ],
-    normalizationContext: ['groups' => ['club:read']],
-    denormalizationContext: ['groups' => ['club:create']]
-)]
 class Club
 {
     #[ORM\Id]

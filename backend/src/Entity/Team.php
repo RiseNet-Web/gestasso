@@ -2,12 +2,7 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\Get;
-use ApiPlatform\Metadata\GetCollection;
-use ApiPlatform\Metadata\Post;
-use ApiPlatform\Metadata\Put;
-use ApiPlatform\Metadata\Delete;
+
 use App\Repository\TeamRepository;
 use App\Enum\TeamMemberRole;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -20,33 +15,6 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Entity(repositoryClass: TeamRepository::class)]
 #[ORM\HasLifecycleCallbacks]
 #[Assert\Callback([Team::class, 'validateAgeRestrictionsCallback'])]
-#[ApiResource(
-    operations: [
-        new GetCollection(
-            security: "is_granted('ROLE_USER')",
-            normalizationContext: ['groups' => ['team:read']]
-        ),
-        new Get(
-            security: "is_granted('TEAM_VIEW', object)",
-            normalizationContext: ['groups' => ['team:read', 'team:details']]
-        ),
-        new Post(
-            security: "is_granted('CLUB_EDIT', object.getClub())",
-            denormalizationContext: ['groups' => ['team:create']],
-            normalizationContext: ['groups' => ['team:read']]
-        ),
-        new Put(
-            security: "is_granted('TEAM_EDIT', object)",
-            denormalizationContext: ['groups' => ['team:update']],
-            normalizationContext: ['groups' => ['team:read']]
-        ),
-        new Delete(
-            security: "is_granted('TEAM_EDIT', object)"
-        )
-    ],
-    normalizationContext: ['groups' => ['team:read']],
-    denormalizationContext: ['groups' => ['team:create']]
-)]
 class Team
 {
     #[ORM\Id]

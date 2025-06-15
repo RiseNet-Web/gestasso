@@ -2,12 +2,6 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\Get;
-use ApiPlatform\Metadata\GetCollection;
-use ApiPlatform\Metadata\Post;
-use ApiPlatform\Metadata\Put;
-use ApiPlatform\Metadata\Delete;
 use App\Enum\DocumentStatus;
 use App\Enum\DocumentType as DocumentTypeEnum;
 use App\Repository\DocumentTypeRepository;
@@ -20,31 +14,6 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: DocumentTypeRepository::class)]
 #[ORM\HasLifecycleCallbacks]
-#[ApiResource(
-    operations: [
-        new GetCollection(
-            normalizationContext: ['groups' => ['document_type:read']],
-            security: "is_granted('ROLE_USER')"
-        ),
-        new Get(
-            normalizationContext: ['groups' => ['document_type:read', 'document_type:details']],
-            security: "is_granted('ROLE_USER')"
-        ),
-        new Post(
-            denormalizationContext: ['groups' => ['document_type:create']],
-            normalizationContext: ['groups' => ['document_type:read']],
-            security: "is_granted('ROLE_CLUB_MANAGER')"
-        ),
-        new Put(
-            denormalizationContext: ['groups' => ['document_type:update']],
-            normalizationContext: ['groups' => ['document_type:read']],
-            security: "is_granted('DOCUMENT_TYPE_EDIT', object)"
-        ),
-        new Delete(
-            security: "is_granted('DOCUMENT_TYPE_DELETE', object)"
-        )
-    ]
-)]
 class DocumentType
 {
 

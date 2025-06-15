@@ -2,12 +2,8 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\Get;
-use ApiPlatform\Metadata\GetCollection;
-use ApiPlatform\Metadata\Post;
-use ApiPlatform\Metadata\Put;
-use ApiPlatform\Metadata\Delete;
+
+
 use App\Enum\TeamMemberRole;
 use App\Repository\TeamMemberRepository;
 use Doctrine\DBAL\Types\Types;
@@ -17,40 +13,13 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: TeamMemberRepository::class)]
 #[ORM\HasLifecycleCallbacks]
-#[ApiResource(
-    operations: [
-        new GetCollection(
-            security: "is_granted('ROLE_USER')",
-            normalizationContext: ['groups' => ['team_member:read']]
-        ),
-        new Get(
-            security: "is_granted('TEAM_VIEW', object.getTeam())",
-            normalizationContext: ['groups' => ['team_member:read', 'team_member:details']]
-        ),
-        new Post(
-            security: "is_granted('TEAM_MANAGE_MEMBERS', object.getTeam())",
-            denormalizationContext: ['groups' => ['team_member:create']],
-            normalizationContext: ['groups' => ['team_member:read']]
-        ),
-        new Put(
-            security: "is_granted('TEAM_MANAGE_MEMBERS', object.getTeam())",
-            denormalizationContext: ['groups' => ['team_member:update']],
-            normalizationContext: ['groups' => ['team_member:read']]
-        ),
-        new Delete(
-            security: "is_granted('TEAM_MANAGE_MEMBERS', object.getTeam())"
-        )
-    ],
-    normalizationContext: ['groups' => ['team_member:read']],
-    denormalizationContext: ['groups' => ['team_member:create']]
-)]
 class TeamMember
 {
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['team_member:read', 'team:details'])]
+    #[Groups(['team_member:read', 'team_member:details'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(inversedBy: 'teamMemberships')]
@@ -64,7 +33,7 @@ class TeamMember
     private ?Team $team = null;
 
     #[ORM\Column(length: 50, enumType: TeamMemberRole::class)]
-    #[Groups(['team_member:read', 'team_member:create', 'team_member:update', 'team:details'])]
+    #[Groups(['team_member:read', 'team_member:details'])]
     private TeamMemberRole $role = TeamMemberRole::ATHLETE;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]

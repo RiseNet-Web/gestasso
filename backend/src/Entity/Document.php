@@ -2,12 +2,7 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\Get;
-use ApiPlatform\Metadata\GetCollection;
-use ApiPlatform\Metadata\Post;
-use ApiPlatform\Metadata\Put;
-use ApiPlatform\Metadata\Delete;
+
 use App\Enum\DocumentStatus;
 use App\Repository\DocumentRepository;
 use Doctrine\DBAL\Types\Types;
@@ -24,31 +19,6 @@ use Vich\UploaderBundle\Mapping\Annotation as Vich;
 #[ORM\Index(columns: ['uploaded_at'], name: 'idx_uploaded_at')]
 #[ORM\HasLifecycleCallbacks]
 #[Vich\Uploadable]
-#[ApiResource(
-    operations: [
-        new GetCollection(
-            normalizationContext: ['groups' => ['document:read']],
-            security: "is_granted('ROLE_USER')"
-        ),
-        new Get(
-            normalizationContext: ['groups' => ['document:read', 'document:details']],
-            security: "is_granted('DOCUMENT_VIEW', object)"
-        ),
-        new Post(
-            denormalizationContext: ['groups' => ['document:create']],
-            normalizationContext: ['groups' => ['document:read']],
-            security: "is_granted('ROLE_USER')"
-        ),
-        new Put(
-            denormalizationContext: ['groups' => ['document:update']],
-            normalizationContext: ['groups' => ['document:read']],
-            security: "is_granted('DOCUMENT_EDIT', object)"
-        ),
-        new Delete(
-            security: "is_granted('DOCUMENT_DELETE', object)"
-        )
-    ]
-)]
 class Document
 {
 
